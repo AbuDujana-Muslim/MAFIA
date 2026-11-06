@@ -1,0 +1,2354 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مافيا - الشبكة المحلية | Mafia LAN Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        /* خلفية متدرجة ديناميكية حسب مرحلة اللعب */
+        .theme-lobby {
+            background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);
+        }
+        .theme-night {
+            background: radial-gradient(circle at top, #1e1b4b 0%, #060714 100%);
+        }
+        .theme-day {
+            background: radial-gradient(circle at top, #451a03 0%, #0c0a09 100%);
+        }
+        .theme-voting {
+            background: radial-gradient(circle at top, #4c0519 0%, #090508 100%);
+        }
+        .theme-ended {
+            background: radial-gradient(circle at top, #064e3b 0%, #040d0a 100%);
+        }
+
+        /* تأثيرات الكروت والأزرار */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .btn-press {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-press:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+        /* شريط التمرير الأنيق */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 9999px;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(245, 158, 11, 0.6); }
+            50% { border-color: rgba(245, 158, 11, 0.15); }
+        }
+        .host-border-glow {
+            animation: pulse-border 2.5s infinite;
+        }
+    </style>
+</head>
+<body id="app-body" class="theme-lobby text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden">
+
+    <!-- حاوية الإشعارات الفورية (Toasts) بدلاً من alert -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md space-y-2 pointer-events-none"></div>
+
+    <!-- الشريط العلوي (Top Navigation & Tools) -->
+    <header class="w-full border-b border-white/10 bg-slate-950/70 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-lg mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+            <!-- الشعار وحالة الاتصال -->
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-rose-900 flex items-center justify-center shadow-lg shadow-red-900/40 text-lg">
+                    🕵️‍♂️
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-black text-base tracking-wide text-white">مافيا</span>
+                        <span class="text-[10px] bg-red-500/20 text-red-300 border border-red-500/30 px-1.5 py-0.5 rounded-md font-bold">LAN PRO</span>
+                    </div>
+                    <p id="connection-status-text" class="text-[11px] text-emerald-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>محرك محلي نشط (جاهز)</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- أزرار الأدوات العلوية -->
+            <div class="flex items-center gap-1.5">
+                <button id="btn-sound-toggle" onclick="toggleSound()" title="تشغيل/كتم المؤثرات الصوتية" class="btn-press bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 font-bold text-slate-200">
+                    <span id="sound-icon">🔊</span>
+                    <span id="sound-label" class="hidden sm:inline">الصوت</span>
+                </button>
+                <button onclick="openModal('rules-modal')" title="قوانين اللعبة" class="btn-press bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs px-2.5 py-1.5 rounded-xl font-bold text-amber-300">
+                    📖 القوانين
+                </button>
+                <button onclick="openModal('server-modal')" title="كود سيرفر الشبكة المحلية بايثون" class="btn-press bg-indigo-950/90 hover:bg-indigo-900 border border-indigo-500/40 text-xs px-2.5 py-1.5 rounded-xl font-bold text-indigo-300">
+                    💻 كود السيرفر
+                </button>
+                <button onclick="triggerHardReset()" title="إعادة ضبط شاملة" class="btn-press bg-rose-950/80 hover:bg-rose-900 border border-rose-500/30 text-xs px-2 py-1.5 rounded-xl font-bold text-rose-300">
+                    🔄
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- المحتوى الرئيسي للتطبيق -->
+    <main class="w-full max-w-lg mx-auto px-3 py-4 flex-grow flex flex-col justify-center space-y-4">
+
+        <!-- شريط معلومات الغرفة النشطة (يظهر داخل اللوبي واللعبة) -->
+        <div id="active-room-bar" class="hidden glass-card px-3.5 py-2.5 rounded-2xl flex items-center justify-between shadow-lg">
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400">كود الغرفة:</span>
+                <span id="room-code-display" class="font-mono font-black text-base tracking-widest text-amber-400 bg-slate-900 px-2.5 py-0.5 rounded-lg border border-amber-500/30">----</span>
+                <button onclick="copyRoomCode()" class="btn-press text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1" title="نسخ كود الغرفة">
+                    <span>📋</span>
+                    <span>نسخ</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span id="player-badge-header" class="text-xs bg-slate-800 px-2.5 py-1 rounded-lg text-slate-300 font-bold border border-slate-700"></span>
+                <button onclick="leaveRoom()" class="btn-press text-xs bg-rose-950/80 hover:bg-rose-900 text-rose-300 px-2.5 py-1 rounded-lg border border-rose-800 font-bold">
+                    خروج 🚪
+                </button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             الشاشة 1: شاشة الدخول وإنشاء الغرفة (#auth-screen)
+             ========================================== -->
+        <section id="auth-screen" class="glass-card p-5 sm:p-6 rounded-3xl shadow-2xl space-y-5 border border-white/10">
+            <div class="text-center space-y-1">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-rose-950 shadow-xl shadow-red-950/60 border border-red-400/30 text-3xl mb-1">
+                    🕵️‍♂️
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-black text-white">لعبة مافيا المحلية</h1>
+                <p class="text-xs sm:text-sm text-slate-400">توزيع أدوار سري • إدارة مراحل الليل والنهار • تصويت إلكتروني</p>
+            </div>
+
+            <!-- حقل اسم اللاعب -->
+            <div class="space-y-1.5">
+                <label for="player-name" class="block text-xs font-bold text-slate-300">اسمك المستعار في اللعبة <span class="text-red-500">*</span></label>
+                <div class="relative">
+                    <input id="player-name" type="text" maxlength="18" value="أبو ياسين" placeholder="مثال: أبو ياسين، القائد، الشبح..."
+                        oninput="clearNameError()"
+                        class="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-500 rounded-2xl px-4 py-3 text-white font-bold placeholder-slate-500 focus:outline-none transition text-base">
+                    <button onclick="fillRandomName()" type="button" class="btn-press absolute left-2 top-1/2 -translate-y-1/2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-xl border border-slate-700">
+                        🎲 اسم عشوائي
+                    </button>
+                </div>
+                <p id="name-error" class="hidden text-xs text-rose-400 font-bold pt-0.5">⚠️ يرجى كتابة اسمك أولاً قبل الدخول أو إنشاء غرفة!</p>
+            </div>
+
+            <!-- زر التجربة السريعة الفورية (1-Click Quick Start) -->
+            <div class="bg-gradient-to-r from-amber-500/15 via-red-500/15 to-indigo-500/15 p-3.5 rounded-2xl border border-amber-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-amber-300">⚡ هل تريد تجربة كل الأزرار والأدوار فوراً؟</span>
+                    <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">موصى به للتجربة</span>
+                </div>
+                <button onclick="quickStartWithBots()" class="btn-press w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black py-3 px-4 rounded-xl shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <span>🚀</span>
+                    <span>إنشاء غرفة فورية مع 6 لاعبين أذكياء (Bots)</span>
+                </button>
+            </div>
+
+            <!-- إنشاء غرفة جديدة -->
+            <div class="space-y-3 pt-1">
+                <button onclick="handleRoomAction('create')" class="btn-press w-full bg-red-600 hover:bg-red-500 text-white font-extrabold py-3.5 rounded-2xl shadow-lg shadow-red-950/60 flex items-center justify-center gap-2 text-base border border-red-400/30">
+                    <span>👑</span>
+                    <span>إنشاء غرفة جديدة فارغة (مدير الغرفة)</span>
+                </button>
+            </div>
+
+            <!-- فاصل -->
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-slate-800"></div>
+                <span class="flex-shrink mx-3 text-slate-400 text-xs font-bold">أو انضم لغرفة أصدقائك</span>
+                <div class="flex-grow border-t border-slate-800"></div>
+            </div>
+
+            <!-- الانضمام بكود الغرفة -->
+            <div class="space-y-2">
+                <div class="flex gap-2">
+                    <input id="room-code-input" type="text" inputmode="numeric" maxlength="4" placeholder="كود من 4 أرقام (مثال: 4821)"
+                        oninput="this.value = this.value.replace(/[^0-9]/g, ''); clearCodeError();"
+                        class="w-2/3 bg-slate-900/90 border border-slate-700 focus:border-emerald-500 rounded-2xl px-3 py-3 text-center font-mono text-lg font-black tracking-widest text-amber-400 placeholder-slate-500 placeholder:text-xs placeholder:tracking-normal focus:outline-none">
+                    <button onclick="handleRoomAction('join')" class="btn-press w-1/3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-1.5 border border-emerald-400/30">
+                        <span>دخول</span>
+                        <span>🚪</span>
+                    </button>
+                </div>
+                <p id="code-error" class="hidden text-xs text-rose-400 font-bold">⚠️ يرجى إدخال كود غرفة صحيح مكوّن من 4 أرقام!</p>
+                <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+                    💡 نصيحة: يمكنك فتح هذه الصفحة في <strong class="text-slate-200">عدة تبويبات متصفح</strong> وإدخال نفس الكود للعب الفعلي بين التبويبات، أو إضافة بوتات ذكية من داخل الغرفة!
+                </p>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             الشاشة 2: صالة الانتظار وإعداد الأدوار (#lobby-screen)
+             ========================================== -->
+        <section id="lobby-screen" class="hidden space-y-4">
+            <!-- قائمة اللاعبين المتصلين -->
+            <div class="glass-card p-5 rounded-3xl space-y-4 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">👥</span>
+                        <h2 class="font-extrabold text-base text-white">اللاعبون في الغرفة</h2>
+                    </div>
+                    <span id="lobby-count-badge" class="bg-slate-800 text-amber-400 border border-slate-700 px-3 py-0.5 rounded-full text-xs font-extrabold">
+                        1 لاعب
+                    </span>
+                </div>
+
+                <!-- قائمة أسماء اللاعبين -->
+                <ul id="lobby-players-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></ul>
+
+                <!-- أدوات إدارة البوتات السريعة (للهوست للتجربة أو تكملة العدد) -->
+                <div id="bot-management-bar" class="pt-2 border-t border-slate-800/80 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-slate-400 font-bold">🤖 أدوات المحاكاة وتكملة العدد:</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="addBotPlayer()" class="btn-press bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+                            <span>+ إضافة بوت</span>
+                        </button>
+                        <button onclick="fillBotsToSix()" class="btn-press bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+                            <span>⚡ إكمال لـ 6</span>
+                        </button>
+                        <button onclick="removeAllBots()" class="btn-press bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+                            <span>🗑️ حذف البوتات</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- لوحة إعدادات توزيع الأدوار (تظهر لمدير الغرفة) -->
+            <div id="host-settings-panel" class="glass-card p-5 rounded-3xl space-y-4 shadow-xl host-border-glow border">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <h3 class="text-sm font-extrabold text-amber-400 flex items-center gap-1.5">
+                        <span>👑</span>
+                        <span>إعدادات توزيع الكروت (مدير الغرفة)</span>
+                    </h3>
+                    <button onclick="autoBalanceRoles()" class="btn-press text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg font-bold">
+                        ⚖️ موازنة تلقائية
+                    </button>
+                </div>
+
+                <!-- عدادات الأدوار بأزرار + و - تفاعلية -->
+                <div class="grid grid-cols-3 gap-2.5 text-center">
+                    <!-- عداد المافيا -->
+                    <div class="bg-slate-900/90 p-3 rounded-2xl border border-red-900/40 flex flex-col justify-between space-y-2">
+                        <div>
+                            <div class="text-xl">🦹‍♂️</div>
+                            <div class="text-xs font-extrabold text-red-400 mt-0.5">المافيا</div>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-950 rounded-xl p-1 border border-slate-800">
+                            <button onclick="adjustRoleCount('mafia', -1)" class="btn-press w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center">-</button>
+                            <span id="count-mafia" class="font-mono font-black text-base text-white">1</span>
+                            <button onclick="adjustRoleCount('mafia', 1)" class="btn-press w-7 h-7 rounded-lg bg-red-700 hover:bg-red-600 text-white font-black text-sm flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+
+                    <!-- عداد الطبيب -->
+                    <div class="bg-slate-900/90 p-3 rounded-2xl border border-emerald-900/40 flex flex-col justify-between space-y-2">
+                        <div>
+                            <div class="text-xl">👨‍⚕️</div>
+                            <div class="text-xs font-extrabold text-emerald-400 mt-0.5">الطبيب</div>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-950 rounded-xl p-1 border border-slate-800">
+                            <button onclick="adjustRoleCount('doctor', -1)" class="btn-press w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center">-</button>
+                            <span id="count-doctor" class="font-mono font-black text-base text-white">1</span>
+                            <button onclick="adjustRoleCount('doctor', 1)" class="btn-press w-7 h-7 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black text-sm flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+
+                    <!-- عداد المحقق -->
+                    <div class="bg-slate-900/90 p-3 rounded-2xl border border-sky-900/40 flex flex-col justify-between space-y-2">
+                        <div>
+                            <div class="text-xl">🕵️</div>
+                            <div class="text-xs font-extrabold text-sky-400 mt-0.5">المحقق</div>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-950 rounded-xl p-1 border border-slate-800">
+                            <button onclick="adjustRoleCount('detective', -1)" class="btn-press w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center">-</button>
+                            <span id="count-detective" class="font-mono font-black text-base text-white">1</span>
+                            <button onclick="adjustRoleCount('detective', 1)" class="btn-press w-7 h-7 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-black text-sm flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ملخص حساب المدنيين والتحقق من صحة التوزيع -->
+                <div class="bg-slate-900/90 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🧑‍🌾</span>
+                        <div>
+                            <p class="text-xs font-bold text-slate-200">المدنيون الأبرياء (يُحسب تلقائياً)</p>
+                            <p class="text-[11px] text-slate-400">بقية اللاعبين الذين لا يملكون دوراً خاصاً</p>
+                        </div>
+                    </div>
+                    <span id="count-civilian" class="font-mono font-black text-lg px-3 py-1 rounded-xl bg-slate-800 text-amber-400 border border-slate-700">
+                        0
+                    </span>
+                </div>
+
+                <!-- رسالة التحقق من التوازن -->
+                <div id="role-validation-box" class="hidden p-3 rounded-xl text-xs font-bold border"></div>
+
+                <!-- خيار تحديد دور اللاعب للتجربة (لتجربة كل شاشة ليلية بسهولة) -->
+                <div class="bg-slate-900/70 p-3 rounded-2xl border border-slate-800 space-y-1.5">
+                    <label for="preferred-role-select" class="block text-xs font-bold text-indigo-300">
+                        🎯 خيار إضافي للتجربة: تحديد دورك أنت في هذه الجولة
+                    </label>
+                    <select id="preferred-role-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-indigo-500">
+                        <option value="random">🎲 عشوائي بالكامل (الوضع الطبيعي العادل)</option>
+                        <option value="mafia">🦹‍♂️ إجبار دوري على: مافيا (لتجربة شاشة القتل الليلي)</option>
+                        <option value="doctor">👨‍⚕️ إجبار دوري على: طبيب (لتجربة شاشة الحماية)</option>
+                        <option value="detective">🕵️ إجبار دوري على: محقق (لتجربة كشف الهويات والسجل)</option>
+                        <option value="civilian">🧑‍🌾 إجبار دوري على: مدني بريء (لتجربة شاشة التمويه)</option>
+                    </select>
+                </div>
+
+                <!-- زر بدء اللعبة وتوزيع الكروت -->
+                <button id="btn-start-game" onclick="startGame()" class="btn-press w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black py-4 rounded-2xl shadow-xl shadow-amber-950/50 text-base flex items-center justify-center gap-2">
+                    <span>🎴</span>
+                    <span>توزيع الكروت السرية وبدء الليلة الأولى</span>
+                </button>
+            </div>
+
+            <!-- رسالة الانتظار للضيوف غير الهوست -->
+            <div id="guest-wait-box" class="hidden glass-card p-5 rounded-3xl text-center space-y-2">
+                <div class="text-2xl animate-bounce">⏳</div>
+                <p class="text-sm font-bold text-slate-200">بانتظار مدير الغرفة لتوزيع الكروت وبدء اللعبة...</p>
+                <p class="text-xs text-slate-400">ستظهر بطاقة دورك السرية على شاشتك فور البدء.</p>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             الشاشة 3: شاشة اللعب النشط (#game-screen)
+             ========================================== -->
+        <section id="game-screen" class="hidden space-y-4">
+
+            <!-- 1. بطاقة الدور السري القابلة للإخفاء التلقائي -->
+            <div class="glass-card p-4 rounded-3xl shadow-xl border border-white/10">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span id="my-alive-indicator" class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            🟢 حي في اللعبة
+                        </span>
+                        <span id="round-counter-badge" class="text-xs font-bold text-slate-400 bg-slate-900 px-2.5 py-1 rounded-full border border-slate-800">
+                            الجولة 1
+                        </span>
+                    </div>
+                    <button id="btn-toggle-role" onclick="toggleSecretRoleCard()" class="btn-press bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
+                        <span>👁️</span>
+                        <span id="role-btn-text">اكشف كرت دورك السري</span>
+                    </button>
+                </div>
+
+                <!-- محتوى الكرت السري (مخفي افتراضياً لمنع التلصص) -->
+                <div id="secret-role-card" class="hidden mt-3 pt-3 border-t border-slate-800 space-y-2.5">
+                    <!-- شريط العد التنازلي للإخفاء التلقائي -->
+                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                        <div id="role-countdown-bar" class="bg-amber-400 h-full transition-all duration-100" style="width: 100%;"></div>
+                    </div>
+                    <div class="bg-slate-900/95 p-4 rounded-2xl border border-slate-700 text-center space-y-1.5 relative overflow-hidden">
+                        <p class="text-[11px] text-slate-400 font-bold">هويتك السرية في هذه المباراة (تُخفى تلقائياً للأمان):</p>
+                        <div id="my-role-icon" class="text-4xl py-1"></div>
+                        <h3 id="my-role-name" class="text-xl font-black"></h3>
+                        <p id="my-role-desc" class="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto"></p>
+                        <div id="my-mafia-allies" class="hidden mt-2 pt-2 border-t border-red-900/50 text-xs font-bold text-red-400"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. لوحة المرحلة والإعلان الرئيسي والمؤقت التفاعلي -->
+            <div class="glass-card p-5 rounded-3xl shadow-2xl text-center space-y-3 border border-white/10">
+                <div class="flex items-center justify-center gap-2">
+                    <span id="phase-badge" class="px-4 py-1 rounded-full text-xs font-black tracking-wide shadow"></span>
+                </div>
+
+                <p id="phase-announcement" class="text-sm sm:text-base font-bold text-white leading-relaxed px-1"></p>
+
+                <!-- صندوق المؤقت الزمني للنقاش أو التصويت -->
+                <div id="timer-container" class="hidden pt-1 space-y-2">
+                    <div id="timer-display" class="font-mono text-3xl sm:text-4xl font-black text-amber-400 tracking-wider bg-slate-950/80 inline-block px-6 py-2 rounded-2xl border border-amber-500/30 shadow-inner">
+                        01:30
+                    </div>
+                    <!-- أزرار التحكم بالمؤقت (للهوست) -->
+                    <div id="timer-host-controls" class="hidden flex items-center justify-center gap-2 pt-1">
+                        <button onclick="modifyTimer(30)" class="btn-press text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg border border-slate-700 font-bold">
+                            +30 ثانية ⏱️
+                        </button>
+                        <button id="btn-pause-timer" onclick="togglePauseTimer()" class="btn-press text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 px-2.5 py-1 rounded-lg border border-slate-700 font-bold">
+                            إيقاف مؤقت ⏸️
+                        </button>
+                        <button onclick="modifyTimer(-30)" class="btn-press text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg border border-slate-700 font-bold">
+                            -30 ثانية
+                        </button>
+                    </div>
+                </div>
+
+                <!-- رسالة تأكيد الإجراء اللحظي (مثل نتيجة تحقيق المحقق أو اختيار الضحية) -->
+                <div id="instant-feedback-banner" class="hidden p-3 rounded-2xl text-xs sm:text-sm font-extrabold border"></div>
+            </div>
+
+            <!-- 3. سجل تحقيقات المحقق الدائم (يظهر فقط إذا كان اللاعب محققاً ولديه تحقيقات) -->
+            <div id="detective-notebook" class="hidden glass-card p-4 rounded-2xl border border-sky-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-sky-400 flex items-center gap-1.5">
+                        <span>🕵️</span>
+                        <span>دفتر تحقيقاتك السري (لا يراه غيرك)</span>
+                    </span>
+                    <span id="detective-Notebook-count" class="text-[11px] bg-sky-950 text-sky-300 px-2 py-0.5 rounded-md font-bold"></span>
+                </div>
+                <div id="detective-history-list" class="grid grid-cols-2 gap-2 text-xs"></div>
+            </div>
+
+            <!-- 4. منطقة التفاعل الرئيسية (اختيار ضحية الليل / التصويت النهاري / التمويه للمدني / النتائج) -->
+            <div id="interaction-card" class="glass-card p-5 rounded-3xl shadow-xl space-y-3.5 border border-white/10">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <h4 id="interaction-title" class="text-xs sm:text-sm font-extrabold text-slate-200"></h4>
+                    <span id="interaction-subbadge" class="text-xs font-bold text-amber-400"></span>
+                </div>
+
+                <!-- شبكة أزرار اللاعبين أو التمويه -->
+                <div id="targets-grid" class="grid grid-cols-2 gap-2.5"></div>
+
+                <!-- زر الامتناع عن التصويت (يظهر فقط في مرحلة التصويت للأحياء) -->
+                <div id="skip-vote-container" class="hidden pt-1">
+                    <button id="btn-skip-vote" onclick="castDayVote('skip')" class="btn-press w-full bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl border border-slate-600 text-xs sm:text-sm flex items-center justify-center gap-2">
+                        <span>🏳️</span>
+                        <span>تخطي التصويت (الامتناع عن اتهام أحد في هذه الجولة)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 5. لوحة تحكم مدير اللعبة (Host Controls) لإدارة تدفق الجولات -->
+            <div id="host-game-controls" class="hidden glass-card p-4 rounded-3xl border border-amber-500/40 space-y-3 host-border-glow">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-amber-400 flex items-center gap-1">
+                        <span>👑</span>
+                        <span>لوحة تحكم مدير الغرفة (Host)</span>
+                    </span>
+                    <span id="host-night-status" class="text-[11px] font-bold text-emerald-400"></span>
+                </div>
+
+                <button id="btn-host-end-night" onclick="hostEndNight()" class="hidden btn-press w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black py-3.5 rounded-2xl shadow-lg text-sm sm:text-base flex items-center justify-center gap-2">
+                    <span>☀️</span>
+                    <span>إنهاء الليل وإشراق الشمس (إعلان الضحية)</span>
+                </button>
+
+                <button id="btn-host-start-voting" onclick="hostStartVoting()" class="hidden btn-press w-full bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg text-sm sm:text-base flex items-center justify-center gap-2">
+                    <span>🗳️</span>
+                    <span>إنهاء النقاش وفتح باب التصويت الآن</span>
+                </button>
+
+                <button id="btn-host-end-voting" onclick="hostEndVoting()" class="hidden btn-press w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black py-3.5 rounded-2xl shadow-lg text-sm sm:text-base flex items-center justify-center gap-2">
+                    <span>⚖️</span>
+                    <span>إغلاق التصويت وفرز الأصوات وإعلان النتيجة</span>
+                </button>
+
+                <button id="btn-host-next-night" onclick="hostNextNight()" class="hidden btn-press w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-3.5 rounded-2xl shadow-lg text-sm sm:text-base flex items-center justify-center gap-2">
+                    <span>🌙</span>
+                    <span>بدء الليلة التالية</span>
+                </button>
+
+                <!-- أزرار نهاية اللعبة -->
+                <div id="host-ended-buttons" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button onclick="hostRestartSameSettings()" class="btn-press w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-1.5">
+                        <span>🔄</span>
+                        <span>جولة جديدة فورية (توزيع جديد)</span>
+                    </button>
+                    <button onclick="hostBackToLobby()" class="btn-press w-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold py-3 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1.5">
+                        <span>⚙️</span>
+                        <span>العودة لإعدادات الغرفة</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 6. سجل أحداث المدينة (Chronological Game Log) -->
+            <div class="glass-card p-4 rounded-3xl space-y-2 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-slate-300 flex items-center gap-1.5">
+                        <span>📜</span>
+                        <span>سجل وقائع المدينة</span>
+                    </span>
+                    <span id="alive-summary-badge" class="text-[11px] text-slate-400 font-bold"></span>
+                </div>
+                <ul id="game-events-log" class="space-y-1.5 max-h-36 overflow-y-auto text-xs text-slate-300 pr-1"></ul>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- تذييل الصفحة -->
+    <footer class="w-full text-center py-3 text-[11px] text-slate-500 border-t border-white/5">
+        تطبيق مافيا الشبكة المحلية (Mafia LAN Pro) • يعمل بالكامل بدون إنترنت مع بوتات ذكية ودعم FastAPI
+    </footer>
+
+    <!-- ==========================================
+         النافذة المنبثقة 1: دليل قوانين لعبة المافيا (#rules-modal)
+         ========================================== -->
+    <div id="rules-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-lg rounded-3xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="font-black text-base text-amber-400 flex items-center gap-2">
+                    <span>📖</span>
+                    <span>دليل قوانين وأدوار لعبة المافيا</span>
+                </h3>
+                <button onclick="closeModal('rules-modal')" class="btn-press w-8 h-8 rounded-xl bg-slate-800 text-slate-300 font-bold">✕</button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm leading-relaxed text-slate-200">
+                <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <h4 class="font-extrabold text-red-400">🎯 فكرة اللعبة الأساسية:</h4>
+                    <p class="text-slate-300">ينقسم اللاعبون سراً إلى فريقين: <strong>المافيا</strong> (يعرفون بعضهم ويسعون لاغتيال أهل المدينة ليلاً) و<strong>المدنيون</strong> (الأغلبية الذين يحاولون كشف المافيا والتصويت لطردهم نهاراً).</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-red-900/40">
+                        <div class="font-extrabold text-red-400 mb-1">🦹‍♂️ المافيا (Mafia)</div>
+                        <p class="text-xs text-slate-300">يستيقظون في الليل عبر شاشات هواتفهم لاختيار ضحية واحدة لاغتيالها بصمت، وفي النهار يتظاهرون بأنهم أبرياء.</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-emerald-900/40">
+                        <div class="font-extrabold text-emerald-400 mb-1">👨‍⚕️ الطبيب (Doctor)</div>
+                        <p class="text-xs text-slate-300">يختار كل ليلة لاعباً واحداً (أو نفسه) لحمايته. إذا استهدفت المافيا نفس الشخص، ينجو من الاغتيال!</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-sky-900/40">
+                        <div class="font-extrabold text-sky-400 mb-1">🕵️ المحقق (Detective)</div>
+                        <p class="text-xs text-slate-300">يختار كل ليلة لاعباً واحداً ليفحص هويته السرية، ويخبره النظام فوراً هل هو من المافيا أم بريء.</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-amber-900/40">
+                        <div class="font-extrabold text-amber-400 mb-1">🧑‍🌾 المدني البريء (Civilian)</div>
+                        <p class="text-xs text-slate-300">ليس لديه مهمة ليلية (يمتلك أزرار تمويه على هاتفه حتى لا ينكشف)، وسلاحه الأقوى هو النقاش والتصويت نهاراً.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <h4 class="font-extrabold text-emerald-400">🏆 متى تنتهي اللعبة؟</h4>
+                    <ul class="list-disc list-inside text-xs text-slate-300 space-y-1">
+                        <li><strong>يفوز المدنيون:</strong> عند إقصاء جميع أفراد المافيا بالكامل.</li>
+                        <li><strong>تفوز المافيا:</strong> عندما يتساوى عدد الأحياء من المافيا مع عدد الأحياء من المدنيين (لأنهم يسيطرون على التصويت).</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-900 border-t border-slate-800 text-left">
+                <button onclick="closeModal('rules-modal')" class="btn-press bg-amber-500 text-slate-950 font-extrabold px-5 py-2 rounded-xl text-xs">فهمت القوانين 👍</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         النافذة المنبثقة 2: كود سيرفر البايثون للشبكة المحلية (#server-modal)
+         ========================================== -->
+    <div id="server-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-2xl rounded-3xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            <div class="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h3 class="font-black text-sm sm:text-base text-indigo-300 flex items-center gap-2">
+                        <span>💻</span>
+                        <span>كود سيرفر الشبكة المحلية (FastAPI + WebSockets)</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">لتشغيل اللعبة عبر نقطة الاتصال (Hotspot) أو الراوتر المحلي بين الهواتف</p>
+                </div>
+                <button onclick="closeModal('server-modal')" class="btn-press w-8 h-8 rounded-xl bg-slate-800 text-slate-300 font-bold">✕</button>
+            </div>
+
+            <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                <div class="bg-indigo-950/50 border border-indigo-500/30 p-3 rounded-2xl space-y-1.5 text-slate-200 leading-relaxed">
+                    <p class="font-bold text-indigo-300">🚀 خطوات التشغيل في 30 ثانية على حاسوبك (Linux / Windows / Mac):</p>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-300">
+                        <li>احفظ ملف الواجهة الحالي باسم <code class="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300">index.html</code> وبجانبه ملف السيرفر أدناه باسم <code class="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300">server.py</code>.</li>
+                        <li>ثبّت المكتبات: <code class="bg-slate-900 px-2 py-0.5 rounded font-mono text-emerald-300" dir="ltr">pip install fastapi "uvicorn[standard]"</code></li>
+                        <li>شغّل السيرفر على الشبكة المحلية: <code class="bg-slate-900 px-2 py-0.5 rounded font-mono text-emerald-300" dir="ltr">uvicorn server:app --host 0.0.0.0 --port 8000</code></li>
+                        <li>يدخل أصدقاؤك المتصلون بنفس الـ Wi-Fi أو الـ Hotspot على عنوان جهازك <code class="bg-slate-900 px-1.5 py-0.5 rounded font-mono text-amber-300" dir="ltr">http://192.168.X.X:8000</code>.</li>
+                    </ol>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-300">ملف <code class="text-amber-400">server.py</code> الكامل:</span>
+                    <div class="flex gap-2">
+                        <button onclick="copyServerCode()" class="btn-press bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1">
+                            <span>📋</span>
+                            <span>نسخ كود Python</span>
+                        </button>
+                        <button onclick="downloadServerFile()" class="btn-press bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1">
+                            <span>💾</span>
+                            <span>تنزيل server.py</span>
+                        </button>
+                    </div>
+                </div>
+
+                <pre id="python-server-code" dir="ltr" class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from typing import Dict, List
+import json
+
+app = FastAPI(title="Mafia LAN Pro Server")
+rooms_ws: Dict[str, List[WebSocket]] = {}
+rooms_state: Dict[str, dict] = {}
+
+@app.get("/")
+async def serve_ui():
+    return FileResponse("index.html")
+
+@app.websocket("/ws/{room_code}")
+async def room_socket(ws: WebSocket, room_code: str):
+    await ws.accept()
+    rooms_ws.setdefault(room_code, []).append(ws)
+    # إرسال آخر حالة محفوظة للغرفة فور انضمام لاعب جديد
+    if room_code in rooms_state:
+        await ws.send_text(json.dumps(rooms_state[room_code]))
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            if msg.get("type") == "SYNC_STATE":
+                rooms_state[room_code] = msg
+            # بث التحديث لجميع هواتف الغرفة على الشبكة المحلية
+            for client in list(rooms_ws.get(room_code, [])):
+                try:
+                    await client.send_text(raw)
+                except:
+                    rooms_ws[room_code].remove(client)
+    except WebSocketDisconnect:
+        if ws in rooms_ws.get(room_code, []):
+            rooms_ws[room_code].remove(ws)</pre>
+            </div>
+
+            <div class="p-3 bg-slate-900 border-t border-slate-800 flex justify-between items-center">
+                <span class="text-[11px] text-slate-400">💡 يتصل التطبيق تلقائياً بالـ WebSocket عند تشغيله عبر <code class="text-slate-200">server.py</code>!</span>
+                <button onclick="closeModal('server-modal')" class="btn-press bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         البرمجة الكاملة والمنطق التفاعلي للعبة (JavaScript)
+         ========================================== -->
+    <script>
+        /* =========================================================
+           1. محرك المؤثرات الصوتية المدمج (Web Audio API Synthesizer)
+           يعمل أوفلاين 100% بدون أي ملفات صوت خارجية
+        ========================================================= */
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioCtx = new AudioContextClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+
+                if (type === 'click') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(240, now + 0.06);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                } else if (type === 'night') {
+                    // نغمة غامضة لليل
+                    [220, 196, 164.8].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+                        gain.gain.setValueAtTime(0.12, now + idx * 0.14);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.14 + 0.35);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + idx * 0.14);
+                        osc.stop(now + idx * 0.14 + 0.36);
+                    });
+                } else if (type === 'day') {
+                    // نغمة مشرقة للصباح
+                    [330, 440, 554.37, 659.25].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        gain.gain.setValueAtTime(0.1, now + idx * 0.09);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.09 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + idx * 0.09);
+                        osc.stop(now + idx * 0.09 + 0.26);
+                    });
+                } else if (type === 'vote') {
+                    // نغمة تنبيه للتصويت
+                    [440, 440].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+                        gain.gain.setValueAtTime(0.05, now + idx * 0.15);
+                        gain.gain.exponentialRampToValueAtTime(0.005, now + idx * 0.15 + 0.1);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + idx * 0.15);
+                        osc.stop(now + idx * 0.15 + 0.11);
+                    });
+                } else if (type === 'win') {
+                    // نغمة الفوز الاحتفالية
+                    [261.6, 329.6, 392.0, 523.25].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+                        gain.gain.setValueAtTime(0.14, now + idx * 0.11);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.11 + 0.4);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + idx * 0.11);
+                        osc.stop(now + idx * 0.11 + 0.42);
+                    });
+                }
+            } catch (e) {
+                // تجاهل أخطاء الصوت في حال منع المتصفح التشغيل التلقائي
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').innerText = soundEnabled ? '🔊' : '🔇';
+            document.getElementById('sound-label').innerText = soundEnabled ? 'الصوت' : 'صامت';
+            if (soundEnabled) playSound('click');
+            showToast(soundEnabled ? '🔊 تم تفعيل المؤثرات الصوتية' : '🔇 تم كتم الصوت', 'info');
+        }
+
+        /* =========================================================
+           2. نظام الإشعارات الفورية (Toasts) والنوافذ المنبثقة
+        ========================================================= */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const styles = {
+                info: 'bg-slate-900/95 border-slate-700 text-slate-100',
+                success: 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200',
+                warning: 'bg-amber-950/95 border-amber-500/50 text-amber-200',
+                error: 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+            };
+            toast.className = `${styles[type] || styles.info} border px-4 py-3 rounded-2xl shadow-2xl text-xs sm:text-sm font-extrabold flex items-center justify-between backdrop-blur-md transition-all duration-300 transform translate-y-0 opacity-100`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 2800);
+        }
+
+        function openModal(id) {
+            playSound('click');
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            playSound('click');
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        /* =========================================================
+           3. حالة اللعبة المركزية (Game State & Synchronization)
+        ========================================================= */
+        const BOT_NAMES_POOL = [
+            "خالد الكشاف", "عمر الفاروق", "سارة الذكية", "أحمد القناص",
+            "ليلى المحققة", "ياسر الصامت", "نور الهدى", "طارق المغامر",
+            "حمزة الشجاع", "ريم الملاحظة", "مازن الداهية", "زيد العادل"
+        ];
+
+        const ROLE_DETAILS = {
+            mafia: {
+                icon: "🦹‍♂️",
+                title: "مافيا (Mafia)",
+                color: "text-red-400",
+                desc: "مهمتك السرية اغتيال المدنيين ليلاً والتظاهر بالبراءة نهاراً لتضليل التصويت."
+            },
+            doctor: {
+                icon: "👨‍⚕️",
+                title: "الطبيب (Doctor)",
+                color: "text-emerald-400",
+                desc: "مهمتك اختيار لاعب واحد كل ليلة (أو نفسك) لحمايته من اغتيال المافيا."
+            },
+            detective: {
+                icon: "🕵️",
+                title: "المحقق (Detective)",
+                color: "text-sky-400",
+                desc: "مهمتك التحقيق في هوية لاعب واحد كل ليلة لكشف المافيا ومساعدة المدنيين."
+            },
+            civilian: {
+                icon: "🧑‍🌾",
+                title: "مدني بريء (Civilian)",
+                color: "text-amber-300",
+                desc: "سلاحك هو الملاحظة، تحليل النقاش النهاري، والتصويت لطرد المافيا من المدينة."
+            }
+        };
+
+        // بيانات اللاعب المحلي على هذا المتصفح/التبويب
+        let localPlayerId = 'p_' + Math.random().toString(36).substring(2, 9);
+        let roleCardTimeout = null;
+        let roleCardInterval = null;
+        let gameTimerInterval = null;
+        let botActionTimeout = null;
+        let broadcastChannel = null;
+        let activeSocket = null;
+
+        // الحالة المشتركة للغرفة
+        let roomState = {
+            code: null,
+            phase: 'auth', // auth, lobby, night, day, voting, vote_result, ended
+            round: 1,
+            players: [], // { id, name, isHost, isBot, role, alive }
+            settings: {
+                mafia: 1,
+                doctor: 1,
+                detective: 1
+            },
+            nightActions: {
+                mafiaTarget: null,
+                doctorSave: null,
+                detectiveTarget: null,
+                completedRoles: [] // لتتبع اكتمال مهام الليل
+            },
+            detectiveHistory: {}, // playerId -> [{ name, role, round }]
+            votes: {}, // voterId -> targetId ('skip' or playerId)
+            lastVoteBreakdown: [], // [{ name, count }]
+            announcement: "",
+            feedbackByPlayer: {}, // playerId -> { text, style }
+            winner: null,
+            logs: [],
+            timerSeconds: 90,
+            timerPaused: false
+        };
+
+        /* =========================================================
+           4. الربط عبر التبويبات (BroadcastChannel) أو WebSocket المحلي
+        ========================================================= */
+        function setupRealtimeSync(roomCode) {
+            // 1. BroadcastChannel للتزامن اللحظي بين التبويبات على نفس الجهاز بدون سيرفر
+            if ('BroadcastChannel' in window) {
+                if (broadcastChannel) broadcastChannel.close();
+                broadcastChannel = new BroadcastChannel('mafia_lan_room_' + roomCode);
+                broadcastChannel.onmessage = (ev) => {
+                    const msg = ev.data;
+                    if (!msg) return;
+                    if (msg.type === 'SYNC_STATE') {
+                        roomState = msg.state;
+                        renderAll();
+                    } else if (msg.type === 'PLAYER_JOIN_REQUEST') {
+                        // إذا كنت الهوست، أضف اللاعب الجديد وأرسل الحالة المحدثة
+                        const me = getMyPlayer();
+                        if (me && me.isHost && roomState.phase === 'lobby') {
+                            if (!roomState.players.some(p => p.id === msg.player.id)) {
+                                roomState.players.push(msg.player);
+                                addGameLog(`انضم (${msg.player.name}) إلى الغرفة 🚪`);
+                                syncAndRender();
+                            } else {
+                                syncAndRender();
+                            }
+                        }
+                    } else if (msg.type === 'PLAYER_ACTION') {
+                        const me = getMyPlayer();
+                        if (me && me.isHost) {
+                            processRemotePlayerAction(msg);
+                        }
+                    }
+                };
+            }
+
+            // 2. محاولة الاتصال بـ WebSocket إذا كان المستخدم مشغلاً لـ server.py
+            if (window.location.protocol.startsWith('http')) {
+                try {
+                    if (activeSocket) activeSocket.close();
+                    const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                    activeSocket = new WebSocket(`${wsProto}://${window.location.host}/ws/${roomCode}`);
+                    activeSocket.onopen = () => {
+                        document.getElementById('connection-status-text').innerHTML = `
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span>متصل بسيرفر الشبكة المحلية (WebSocket)</span>
+                        `;
+                    };
+                    activeSocket.onmessage = (event) => {
+                        try {
+                            const msg = JSON.parse(event.data);
+                            if (msg.type === 'SYNC_STATE' && msg.sender !== localPlayerId) {
+                                roomState = msg.state;
+                                renderAll();
+                            } else if (msg.type === 'PLAYER_JOIN_REQUEST') {
+                                const me = getMyPlayer();
+                                if (me && me.isHost && roomState.phase === 'lobby') {
+                                    if (!roomState.players.some(p => p.id === msg.player.id)) {
+                                        roomState.players.push(msg.player);
+                                        syncAndRender();
+                                    }
+                                }
+                            } else if (msg.type === 'PLAYER_ACTION') {
+                                const me = getMyPlayer();
+                                if (me && me.isHost) processRemotePlayerAction(msg);
+                            }
+                        } catch (err) {}
+                    };
+                } catch (e) {}
+            }
+        }
+
+        function broadcastMessage(payload) {
+            if (broadcastChannel) {
+                try { broadcastChannel.postMessage(payload); } catch (e) {}
+            }
+            if (activeSocket && activeSocket.readyState === WebSocket.OPEN) {
+                try { activeSocket.send(JSON.stringify(payload)); } catch (e) {}
+            }
+        }
+
+        function syncAndRender() {
+            // حفظ نسخة في localStorage حتى يتمكن أي تبويب جديد من قراءة الغرفة فوراً
+            if (roomState.code) {
+                try {
+                    localStorage.setItem('mafia_room_' + roomState.code, JSON.stringify(roomState));
+                } catch (e) {}
+            }
+            broadcastMessage({
+                type: 'SYNC_STATE',
+                sender: localPlayerId,
+                state: roomState
+            });
+            renderAll();
+        }
+
+        function processRemotePlayerAction(msg) {
+            if (msg.actionType === 'NIGHT_TARGET') {
+                executeNightSelection(msg.playerId, msg.targetId);
+            } else if (msg.actionType === 'DAY_VOTE') {
+                executeDayVote(msg.playerId, msg.targetId);
+            }
+        }
+
+        /* =========================================================
+           5. دوال شاشة البداية، الإنشاء، الانضمام، والتجربة السريعة
+        ========================================================= */
+        function clearNameError() {
+            document.getElementById('name-error').classList.add('hidden');
+        }
+
+        function clearCodeError() {
+            document.getElementById('code-error').classList.add('hidden');
+        }
+
+        function fillRandomName() {
+            playSound('click');
+            const randomNames = ["أبو ياسين", "الذئب الوحيد", "المحقق كونان", "صقر الجزيرة", "أبو شهاب", "العراب", "النمر المقنع"];
+            const pick = randomNames[Math.floor(Math.random() * randomNames.length)];
+            document.getElementById('player-name').value = pick;
+            clearNameError();
+        }
+
+        function generateRoomCode() {
+            return Math.floor(1000 + Math.random() * 9000).toString();
+        }
+
+        function handleRoomAction(mode) {
+            playSound('click');
+            const nameInput = document.getElementById('player-name');
+            const playerName = nameInput.value.trim();
+
+            if (!playerName) {
+                document.getElementById('name-error').classList.remove('hidden');
+                nameInput.focus();
+                showToast('⚠️ يرجى كتابة اسمك المستعار أولاً!', 'error');
+                return;
+            }
+
+            if (mode === 'create') {
+                const newCode = generateRoomCode();
+                roomState = {
+                    code: newCode,
+                    phase: 'lobby',
+                    round: 1,
+                    players: [{
+                        id: localPlayerId,
+                        name: playerName,
+                        isHost: true,
+                        isBot: false,
+                        role: null,
+                        alive: true
+                    }],
+                    settings: { mafia: 1, doctor: 1, detective: 1 },
+                    nightActions: { mafiaTarget: null, doctorSave: null, detectiveTarget: null, completedRoles: [] },
+                    detectiveHistory: {},
+                    votes: {},
+                    lastVoteBreakdown: [],
+                    announcement: "",
+                    feedbackByPlayer: {},
+                    winner: null,
+                    logs: [`تم إنشاء الغرفة رقم (${newCode}) بواسطة ${playerName} 👑`],
+                    timerSeconds: 90,
+                    timerPaused: false
+                };
+                setupRealtimeSync(newCode);
+                syncAndRender();
+                showToast(`👑 تم إنشاء الغرفة بنجاح! كود الغرفة: ${newCode}`, 'success');
+            } else if (mode === 'join') {
+                const codeInput = document.getElementById('room-code-input');
+                const code = codeInput.value.trim();
+                if (code.length !== 4) {
+                    document.getElementById('code-error').classList.remove('hidden');
+                    codeInput.focus();
+                    showToast('⚠️ كود الغرفة يجب أن يتكون من 4 أرقام!', 'error');
+                    return;
+                }
+
+                setupRealtimeSync(code);
+                // فحص ما إذا كانت الغرفة محفوظة محلياً في المتصفح
+                const savedRaw = localStorage.getItem('mafia_room_' + code);
+                if (savedRaw) {
+                    try {
+                        const savedState = JSON.parse(savedRaw);
+                        roomState = savedState;
+                        if (!roomState.players.some(p => p.id === localPlayerId)) {
+                            roomState.players.push({
+                                id: localPlayerId,
+                                name: playerName,
+                                isHost: false,
+                                isBot: false,
+                                role: null,
+                                alive: true
+                            });
+                        }
+                        syncAndRender();
+                        showToast(`🚪 تم الانضمام إلى الغرفة (${code}) بنجاح!`, 'success');
+                        return;
+                    } catch (e) {}
+                }
+
+                // إذا لم تكن موجودة في نفس المتصفح، ننشئ غرفة محلية بهذا الكود ونضيف اللاعب
+                roomState = {
+                    code: code,
+                    phase: 'lobby',
+                    round: 1,
+                    players: [{
+                        id: localPlayerId,
+                        name: playerName,
+                        isHost: true,
+                        isBot: false,
+                        role: null,
+                        alive: true
+                    }],
+                    settings: { mafia: 1, doctor: 1, detective: 1 },
+                    nightActions: { mafiaTarget: null, doctorSave: null, detectiveTarget: null, completedRoles: [] },
+                    detectiveHistory: {},
+                    votes: {},
+                    lastVoteBreakdown: [],
+                    announcement: "",
+                    feedbackByPlayer: {},
+                    winner: null,
+                    logs: [`تم فتح الغرفة رقم (${code}) والاتصال بها 🚪`],
+                    timerSeconds: 90,
+                    timerPaused: false
+                };
+                broadcastMessage({
+                    type: 'PLAYER_JOIN_REQUEST',
+                    player: {
+                        id: localPlayerId,
+                        name: playerName,
+                        isHost: false,
+                        isBot: false,
+                        role: null,
+                        alive: true
+                    }
+                });
+                syncAndRender();
+                showToast(`🚪 تم الدخول إلى الغرفة (${code})!`, 'success');
+            }
+        }
+
+        // زر التجربة الفورية مع 6 لاعبين افتراضيين
+        function quickStartWithBots() {
+            const nameInput = document.getElementById('player-name');
+            if (!nameInput.value.trim()) {
+                nameInput.value = "أبو ياسين";
+            }
+            handleRoomAction('create');
+            fillBotsToSix();
+            showToast('🤖 تم تجهيز الغرفة مع 6 لاعبين! يمكنك تعديل الأدوار أو البدء فوراً.', 'success');
+        }
+
+        function copyRoomCode() {
+            playSound('click');
+            if (!roomState.code) return;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = roomState.code;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast(`📋 تم نسخ كود الغرفة (${roomState.code}) إلى الحافظة!`, 'success');
+        }
+
+        function leaveRoom() {
+            playSound('click');
+            clearInterval(gameTimerInterval);
+            clearTimeout(botActionTimeout);
+            roomState.phase = 'auth';
+            roomState.code = null;
+            renderAll();
+            showToast('👋 قمت بمغادرة الغرفة.', 'info');
+        }
+
+        function triggerHardReset() {
+            playSound('click');
+            clearInterval(gameTimerInterval);
+            clearTimeout(botActionTimeout);
+            if (roomState.code) {
+                localStorage.removeItem('mafia_room_' + roomState.code);
+            }
+            roomState.phase = 'auth';
+            roomState.code = null;
+            renderAll();
+            showToast('🔄 تمت إعادة ضبط التطبيق بالكامل.', 'info');
+        }
+
+        /* =========================================================
+           6. إدارة صالة الانتظار (Lobby)، البوتات، وتوزيع الأدوار
+        ========================================================= */
+        function getMyPlayer() {
+            return roomState.players.find(p => p.id === localPlayerId) || roomState.players[0];
+        }
+
+        function addBotPlayer() {
+            playSound('click');
+            if (roomState.players.length >= 16) {
+                showToast('⚠️ الحد الأقصى للغرفة هو 16 لاعباً!', 'warning');
+                return;
+            }
+            const usedNames = roomState.players.map(p => p.name);
+            const available = BOT_NAMES_POOL.filter(n => !usedNames.includes(n));
+            const botName = available.length > 0
+                ? available[Math.floor(Math.random() * available.length)]
+                : `لاعب آلي ${roomState.players.length}`;
+
+            roomState.players.push({
+                id: 'bot_' + Math.random().toString(36).substring(2, 9),
+                name: botName,
+                isHost: false,
+                isBot: true,
+                role: null,
+                alive: true
+            });
+            syncAndRender();
+        }
+
+        function fillBotsToSix() {
+            playSound('click');
+            while (roomState.players.length < 6) {
+                const usedNames = roomState.players.map(p => p.name);
+                const available = BOT_NAMES_POOL.filter(n => !usedNames.includes(n));
+                const botName = available.length > 0 ? available[0] : `بوت ${roomState.players.length}`;
+                roomState.players.push({
+                    id: 'bot_' + Math.random().toString(36).substring(2, 9),
+                    name: botName,
+                    isHost: false,
+                    isBot: true,
+                    role: null,
+                    alive: true
+                });
+            }
+            autoBalanceRoles();
+            syncAndRender();
+        }
+
+        function removeAllBots() {
+            playSound('click');
+            const before = roomState.players.length;
+            roomState.players = roomState.players.filter(p => !p.isBot);
+            if (roomState.players.length < before) {
+                showToast('🗑️ تم حذف جميع البوتات من الغرفة.', 'info');
+            }
+            syncAndRender();
+        }
+
+        function kickPlayer(playerId) {
+            playSound('click');
+            const target = roomState.players.find(p => p.id === playerId);
+            if (!target || target.isHost) return;
+            roomState.players = roomState.players.filter(p => p.id !== playerId);
+            showToast(`✖ تم استبعاد (${target.name}) من الغرفة.`, 'info');
+            syncAndRender();
+        }
+
+        function adjustRoleCount(roleKey, delta) {
+            playSound('click');
+            const current = roomState.settings[roleKey];
+            const minVal = roleKey === 'mafia' ? 1 : 0;
+            const maxVal = roleKey === 'mafia' ? 5 : 3;
+            const nextVal = Math.max(minVal, Math.min(maxVal, current + delta));
+            roomState.settings[roleKey] = nextVal;
+            syncAndRender();
+        }
+
+        function autoBalanceRoles() {
+            playSound('click');
+            const total = roomState.players.length;
+            if (total < 4) {
+                roomState.settings = { mafia: 1, doctor: 1, detective: 0 };
+            } else if (total <= 6) {
+                roomState.settings = { mafia: 1, doctor: 1, detective: 1 };
+            } else if (total <= 9) {
+                roomState.settings = { mafia: 2, doctor: 1, detective: 1 };
+            } else {
+                roomState.settings = { mafia: 3, doctor: 1, detective: 1 };
+            }
+            syncAndRender();
+        }
+
+        function validateRoleSetup() {
+            const total = roomState.players.length;
+            const { mafia, doctor, detective } = roomState.settings;
+            const specials = mafia + doctor + detective;
+            const civilians = total - specials;
+            const nonMafia = total - mafia;
+
+            if (total < 4) {
+                return {
+                    valid: false,
+                    civilians: Math.max(0, civilians),
+                    msg: `⚠️ تحتاج إلى 4 لاعبين على الأقل لبدء لعبة متوازنة (الحالي: ${total}). اضغط "+ إضافة بوت" للتجربة!`
+                };
+            }
+            if (specials > total) {
+                return {
+                    valid: false,
+                    civilians: civilians,
+                    msg: `⚠️ مجموع الأدوار الخاصة (${specials}) أكبر من إجمالي عدد اللاعبين (${total})!`
+                };
+            }
+            if (mafia >= nonMafia) {
+                return {
+                    valid: false,
+                    civilians: civilians,
+                    msg: `⚠️ عدد المافيا (${mafia}) مساوٍ أو أكبر من عدد المدنيين والأدوار الطيبة (${nonMafia})! قلل المافيا أو أضف لاعبين.`
+                };
+            }
+            return {
+                valid: true,
+                civilians: civilians,
+                msg: `✅ التوزيع مثالي ومتوازن: ${mafia} مافيا ضد ${nonMafia} من أهل المدينة.`
+            };
+        }
+
+        /* =========================================================
+           7. بدء اللعبة وتوزيع الكروت السرية وإدارة الليل والنهار
+        ========================================================= */
+        function startGame() {
+            const check = validateRoleSetup();
+            if (!check.valid) {
+                playSound('vote');
+                showToast(check.msg, 'error');
+                return;
+            }
+
+            playSound('night');
+            const total = roomState.players.length;
+            const { mafia, doctor, detective } = roomState.settings;
+            const civilians = total - (mafia + doctor + detective);
+
+            // إنشاء مصفوفة الأدوار
+            let pool = [
+                ...Array(mafia).fill('mafia'),
+                ...Array(doctor).fill('doctor'),
+                ...Array(detective).fill('detective'),
+                ...Array(civilians).fill('civilian')
+            ];
+
+            // خلط الأدوار عشوائياً (Fisher-Yates Shuffle)
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            // التحقق مما إذا اختار الهوست دوراً محدداً للتجربة
+            const preferredRole = document.getElementById('preferred-role-select').value;
+            if (preferredRole !== 'random') {
+                // إذا كان الدور المفضل غير موجود في التوزيع (مثلاً اختار محقق وعدد المحققين 0)، نضمن وجوده
+                let idxInPool = pool.indexOf(preferredRole);
+                if (idxInPool === -1) {
+                    pool[0] = preferredRole;
+                    idxInPool = 0;
+                }
+                // وضع الدور المفضل للاعب المحلي (غالباً الفهرس 0)
+                const myIndex = roomState.players.findIndex(p => p.id === localPlayerId);
+                if (myIndex !== -1 && idxInPool !== -1) {
+                    [pool[myIndex], pool[idxInPool]] = [pool[idxInPool], pool[myIndex]];
+                }
+            }
+
+            // تعيين الأدوار للاعبين
+            roomState.players.forEach((p, idx) => {
+                p.role = pool[idx];
+                p.alive = true;
+            });
+
+            roomState.round = 1;
+            roomState.phase = 'night';
+            roomState.winner = null;
+            roomState.detectiveHistory = {};
+            roomState.votes = {};
+            roomState.lastVoteBreakdown = [];
+            roomState.feedbackByPlayer = {};
+            roomState.nightActions = {
+                mafiaTarget: null,
+                doctorSave: null,
+                detectiveTarget: null,
+                completedRoles: []
+            };
+            roomState.announcement = "حلّ الليل الأول على المدينة 🌙.. افتح كرت دورك السري ونفّذ مهمتك الليلية بصمت تام!";
+            roomState.logs = [`🎴 بدأت المباراة وتم توزيع الكروت السرية على ${total} لاعبين.`];
+
+            syncAndRender();
+            scheduleBotNightActions();
+            showToast('🎴 تم توزيع الكروت السرية! اضغط على زر كشف الكرت لرؤية دورك.', 'success');
+        }
+
+        function addGameLog(text) {
+            const timeStr = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            roomState.logs.unshift(`[${timeStr}] ${text}`);
+        }
+
+        // إظهار/إخفاء كرت الدور السري مع عد تنازلي 5 ثوانٍ للأمان
+        function toggleSecretRoleCard() {
+            playSound('click');
+            const card = document.getElementById('secret-role-card');
+            const btnText = document.getElementById('role-btn-text');
+            const bar = document.getElementById('role-countdown-bar');
+
+            if (!card.classList.contains('hidden')) {
+                hideSecretRoleCard();
+                return;
+            }
+
+            card.classList.remove('hidden');
+            btnText.innerText = 'إخفاء الكرت الآن 🙈';
+            bar.style.width = '100%';
+
+            clearTimeout(roleCardTimeout);
+            clearInterval(roleCardInterval);
+
+            let elapsed = 0;
+            const duration = 5000;
+            roleCardInterval = setInterval(() => {
+                elapsed += 100;
+                const pct = Math.max(0, 100 - (elapsed / duration) * 100);
+                bar.style.width = pct + '%';
+            }, 100);
+
+            roleCardTimeout = setTimeout(() => {
+                hideSecretRoleCard();
+            }, duration);
+        }
+
+        function hideSecretRoleCard() {
+            const card = document.getElementById('secret-role-card');
+            const btnText = document.getElementById('role-btn-text');
+            if (card) card.classList.add('hidden');
+            if (btnText) btnText.innerText = 'اكشف كرت دورك السري';
+            clearTimeout(roleCardTimeout);
+            clearInterval(roleCardInterval);
+        }
+
+        /* =========================================================
+           8. تفاعلات مرحلة الليل (مافيا، طبيب، محقق، تمويه مدني، وبوتات)
+        ========================================================= */
+        function handleNightClick(targetId) {
+            playSound('click');
+            const me = getMyPlayer();
+            if (!me || !me.alive || roomState.phase !== 'night') return;
+
+            if (!me.isHost) {
+                broadcastMessage({
+                    type: 'PLAYER_ACTION',
+                    actionType: 'NIGHT_TARGET',
+                    playerId: me.id,
+                    targetId: targetId
+                });
+            }
+            executeNightSelection(me.id, targetId);
+        }
+
+        function executeNightSelection(actorId, targetId) {
+            const actor = roomState.players.find(p => p.id === actorId);
+            const target = roomState.players.find(p => p.id === targetId);
+            if (!actor || !actor.alive || !target || !target.alive) return;
+
+            if (actor.role === 'mafia') {
+                roomState.nightActions.mafiaTarget = target.id;
+                if (!roomState.nightActions.completedRoles.includes('mafia')) {
+                    roomState.nightActions.completedRoles.push('mafia');
+                }
+                roomState.feedbackByPlayer[actor.id] = {
+                    text: `🎯 تم تحديد (${target.name}) كضحية للمافيا هذه الليلة. يمكنك تغيير الهدف قبل شروق الشمس.`,
+                    style: 'bg-red-950/90 border-red-500/50 text-red-200'
+                };
+                if (actor.id === localPlayerId) {
+                    showToast(`🎯 تم استهداف (${target.name}) للاغتيال`, 'warning');
+                }
+            } else if (actor.role === 'doctor') {
+                roomState.nightActions.doctorSave = target.id;
+                if (!roomState.nightActions.completedRoles.includes('doctor')) {
+                    roomState.nightActions.completedRoles.push('doctor');
+                }
+                roomState.feedbackByPlayer[actor.id] = {
+                    text: `💉 قمت بوضع الحراسة الطبية على (${target.name}) لهذه الليلة.`,
+                    style: 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+                };
+                if (actor.id === localPlayerId) {
+                    showToast(`💉 تمت حماية (${target.name})`, 'success');
+                }
+            } else if (actor.role === 'detective') {
+                // المحقق يحقق مرة واحدة فقط كل ليلة لمنع الغش
+                if (roomState.nightActions.completedRoles.includes('detective_' + actor.id)) {
+                    if (actor.id === localPlayerId) {
+                        showToast('🕵️ لقد استنفدت تحقيقك السري لهذه الليلة بالفعل!', 'warning');
+                    }
+                    return;
+                }
+                roomState.nightActions.detectiveTarget = target.id;
+                roomState.nightActions.completedRoles.push('detective_' + actor.id);
+                if (!roomState.nightActions.completedRoles.includes('detective')) {
+                    roomState.nightActions.completedRoles.push('detective');
+                }
+
+                const isSuspectMafia = target.role === 'mafia';
+                const verdictText = isSuspectMafia ? 'مافيا خطير 🦹‍♂️!' : 'مدني بريء 👤';
+                roomState.feedbackByPlayer[actor.id] = {
+                    text: `🔍 نتيجة تحقيقك السري حول (${target.name}): تبين أنه [${verdictText}]`,
+                    style: isSuspectMafia
+                        ? 'bg-rose-950/95 border-rose-500 text-rose-200'
+                        : 'bg-sky-950/95 border-sky-500 text-sky-200'
+                };
+
+                if (!roomState.detectiveHistory[actor.id]) {
+                    roomState.detectiveHistory[actor.id] = [];
+                }
+                roomState.detectiveHistory[actor.id].push({
+                    targetId: target.id,
+                    name: target.name,
+                    isMafia: isSuspectMafia,
+                    round: roomState.round
+                });
+
+                if (actor.id === localPlayerId) {
+                    showToast(`🔍 تم كشف هوية (${target.name}): ${verdictText}`, isSuspectMafia ? 'error' : 'info');
+                }
+            }
+
+            syncAndRender();
+        }
+
+        // زر التمويه للمدني أثناء الليل حتى لا يعرف الجالسون حوله أنه مدني لا ينقر على الشاشة
+        function triggerCivilianDecoyClick(idx) {
+            playSound('click');
+            const me = getMyPlayer();
+            if (!me) return;
+            const decoyMessages = [
+                "🎭 نقرة تمويهية ممتازة! يظن الجالسون حولك الآن أنك تقوم بمهمة ليلية سرية.",
+                "🤫 تمويه ذكي! واصل التظاهر بالتفكير قبل الضغط حتى لا تكشف المافيا أنك مدني.",
+                "✨ تم تسجيل نقرة التمويه بنجاح على شاشتك فقط."
+            ];
+            roomState.feedbackByPlayer[me.id] = {
+                text: decoyMessages[idx % decoyMessages.length],
+                style: 'bg-indigo-950/90 border-indigo-500/40 text-indigo-200'
+            };
+            renderAll();
+        }
+
+        // ذكاء اصطناعي للبوتات في الليل
+        function scheduleBotNightActions() {
+            clearTimeout(botActionTimeout);
+            botActionTimeout = setTimeout(() => {
+                if (roomState.phase !== 'night') return;
+                const alivePlayers = roomState.players.filter(p => p.alive);
+
+                // 1. إذا لم يختر لاعب بشري من المافيا هدفاً، يختار بوت المافيا هدفاً غير مافيا
+                const humanMafiaAlive = alivePlayers.some(p => p.role === 'mafia' && !p.isBot);
+                const botMafia = alivePlayers.find(p => p.role === 'mafia' && p.isBot);
+                if (!humanMafiaAlive && botMafia && !roomState.nightActions.mafiaTarget) {
+                    const nonMafiaTargets = alivePlayers.filter(p => p.role !== 'mafia');
+                    if (nonMafiaTargets.length > 0) {
+                        const victim = nonMafiaTargets[Math.floor(Math.random() * nonMafiaTargets.length)];
+                        roomState.nightActions.mafiaTarget = victim.id;
+                        if (!roomState.nightActions.completedRoles.includes('mafia')) {
+                            roomState.nightActions.completedRoles.push('mafia');
+                        }
+                    }
+                }
+
+                // 2. إذا كان الطبيب بوتاً، يحمي أحد الأحياء عشوائياً
+                const humanDocAlive = alivePlayers.some(p => p.role === 'doctor' && !p.isBot);
+                const botDoc = alivePlayers.find(p => p.role === 'doctor' && p.isBot);
+                if (!humanDocAlive && botDoc && !roomState.nightActions.doctorSave) {
+                    const saveTarget = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+                    roomState.nightActions.doctorSave = saveTarget.id;
+                    if (!roomState.nightActions.completedRoles.includes('doctor')) {
+                        roomState.nightActions.completedRoles.push('doctor');
+                    }
+                }
+
+                // 3. إذا كان المحقق بوتاً، يفحص لاعباً
+                const humanDetAlive = alivePlayers.some(p => p.role === 'detective' && !p.isBot);
+                const botDet = alivePlayers.find(p => p.role === 'detective' && p.isBot);
+                if (!humanDetAlive && botDet && !roomState.nightActions.completedRoles.includes('detective')) {
+                    const suspects = alivePlayers.filter(p => p.id !== botDet.id);
+                    if (suspects.length > 0) {
+                        const pick = suspects[Math.floor(Math.random() * suspects.length)];
+                        roomState.nightActions.detectiveTarget = pick.id;
+                        roomState.nightActions.completedRoles.push('detective');
+                    }
+                }
+
+                syncAndRender();
+            }, 1100);
+        }
+
+        /* =========================================================
+           9. الانتقال للنهار، المؤقت، ونظام التصويت
+        ========================================================= */
+        function hostEndNight() {
+            playSound('day');
+            const victimId = roomState.nightActions.mafiaTarget;
+            const savedId = roomState.nightActions.doctorSave;
+            roomState.feedbackByPlayer = {};
+
+            if (victimId && victimId !== savedId) {
+                const victim = roomState.players.find(p => p.id === victimId);
+                if (victim) {
+                    victim.alive = false;
+                    roomState.announcement = `أشرقت شمس اليوم (${roomState.round}) ☀️.. للأسف عثرت المدينة صباح اليوم على (${victim.name}) مقتولاً على يد المافيا!`;
+                    addGameLog(`💀 الليلة ${roomState.round}: تم اغتيال (${victim.name}) في الليل.`);
+                }
+            } else if (victimId && victimId === savedId) {
+                const savedPlayer = roomState.players.find(p => p.id === savedId);
+                roomState.announcement = `أشرقت شمس اليوم (${roomState.round}) ☀️.. حاولت المافيا ارتكاب جريمة الليلة الماضية، لكن تدخل الطبيب أنقذ الضحية في اللحظة الأخيرة! 💉`;
+                addGameLog(`💉 الليلة ${roomState.round}: أنقذ الطبيب حياة (${savedPlayer ? savedPlayer.name : 'أحد اللاعبين'}) من الاغتيال!`);
+            } else {
+                roomState.announcement = `أشرقت شمس اليوم (${roomState.round}) ☀️.. مرت ليلة هادئة ولم يُقتل أحد في المدينة.`;
+                addGameLog(`☀️ الليلة ${roomState.round}: مرت الليلة بسلام دون ضحايا.`);
+            }
+
+            if (!checkWinCondition()) {
+                roomState.phase = 'day';
+                startPhaseTimer(90);
+            }
+            syncAndRender();
+        }
+
+        function hostStartVoting() {
+            playSound('vote');
+            roomState.phase = 'voting';
+            roomState.votes = {};
+            roomState.feedbackByPlayer = {};
+            roomState.announcement = "🗳️ فُتح باب التصويت! اختر الشخص الذي تشك أنه من المافيا أو اختر تخطي التصويت.";
+            startPhaseTimer(60);
+            syncAndRender();
+            scheduleBotVotes();
+        }
+
+        function castDayVote(targetId) {
+            playSound('click');
+            const me = getMyPlayer();
+            if (!me || !me.alive || roomState.phase !== 'voting') return;
+
+            if (!me.isHost) {
+                broadcastMessage({
+                    type: 'PLAYER_ACTION',
+                    actionType: 'DAY_VOTE',
+                    playerId: me.id,
+                    targetId: targetId
+                });
+            }
+            executeDayVote(me.id, targetId);
+        }
+
+        function executeDayVote(voterId, targetId) {
+            const voter = roomState.players.find(p => p.id === voterId);
+            if (!voter || !voter.alive || roomState.phase !== 'voting') return;
+
+            roomState.votes[voterId] = targetId;
+
+            if (targetId === 'skip') {
+                roomState.feedbackByPlayer[voterId] = {
+                    text: `🏳️ اخترت الامتناع عن التصويت في هذه الجولة. يمكنك تغيير رأيك قبل إغلاق التصويت.`,
+                    style: 'bg-slate-900 border-slate-600 text-slate-200'
+                };
+                if (voterId === localPlayerId) showToast('🏳️ تم تسجيل امتناعك عن التصويت', 'info');
+            } else {
+                const target = roomState.players.find(p => p.id === targetId);
+                if (target) {
+                    roomState.feedbackByPlayer[voterId] = {
+                        text: `🗳️ صوتك الحالي موجّه ضد (${target.name}). يمكنك تغييره قبل فرز الأصوات.`,
+                        style: 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+                    };
+                    if (voterId === localPlayerId) showToast(`🗳️ صوّتت ضد (${target.name})`, 'warning');
+                }
+            }
+            syncAndRender();
+        }
+
+        function scheduleBotVotes() {
+            clearTimeout(botActionTimeout);
+            botActionTimeout = setTimeout(() => {
+                if (roomState.phase !== 'voting') return;
+                const alivePlayers = roomState.players.filter(p => p.alive);
+                const aliveBots = alivePlayers.filter(p => p.isBot);
+
+                aliveBots.forEach(bot => {
+                    if (roomState.votes[bot.id]) return;
+                    // احتمال 15% أن يمتنع البوت عن التصويت، و85% يصوت ضد لاعب آخر
+                    if (Math.random() < 0.15) {
+                        roomState.votes[bot.id] = 'skip';
+                    } else {
+                        let candidates = alivePlayers.filter(p => p.id !== bot.id);
+                        // إذا كان البوت مافيا، يتجنب التصويت ضد زميله المافيا
+                        if (bot.role === 'mafia') {
+                            const nonMafia = candidates.filter(p => p.role !== 'mafia');
+                            if (nonMafia.length > 0) candidates = nonMafia;
+                        }
+                        if (candidates.length > 0) {
+                            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                            roomState.votes[bot.id] = pick.id;
+                        }
+                    }
+                });
+                syncAndRender();
+            }, 1200);
+        }
+
+        function hostEndVoting() {
+            playSound('vote');
+            clearInterval(gameTimerInterval);
+            roomState.feedbackByPlayer = {};
+
+            const tally = {};
+            let skipCount = 0;
+
+            Object.values(roomState.votes).forEach(targetId => {
+                if (targetId === 'skip') {
+                    skipCount++;
+                } else {
+                    tally[targetId] = (tally[targetId] || 0) + 1;
+                }
+            });
+
+            // تجهيز قائمة تفاصيل الأصوات لعرضها بشفافية
+            const breakdown = [];
+            Object.entries(tally).forEach(([pid, count]) => {
+                const pl = roomState.players.find(p => p.id === pid);
+                if (pl) breakdown.push({ name: pl.name, count, isSkip: false });
+            });
+            breakdown.sort((a, b) => b.count - a.count);
+            if (skipCount > 0) {
+                breakdown.push({ name: "امتناع عن التصويت 🏳️", count: skipCount, isSkip: true });
+            }
+            roomState.lastVoteBreakdown = breakdown;
+
+            const candidateIds = Object.keys(tally);
+            if (candidateIds.length === 0) {
+                roomState.announcement = "⚖️ انتهى التصويت دون توجيه اتهامات لأي شخص! لم يتم إقصاء أحد اليوم.";
+                addGameLog(`⚖️ اليوم ${roomState.round}: لم يصوت أحد، لم يُستبعد أي لاعب.`);
+            } else {
+                const maxVotes = Math.max(...Object.values(tally));
+                const topCandidates = candidateIds.filter(id => tally[id] === maxVotes);
+
+                if (skipCount >= maxVotes) {
+                    roomState.announcement = `🏳️ قررت الأغلبية الامتناع عن التصويت (${skipCount} أصوات امتناع)! لم يتم إقصاء أحد في هذا اليوم.`;
+                    addGameLog(`🏳️ اليوم ${roomState.round}: تم تخطي الإقصاء بسبب أغلبية الامتناع.`);
+                } else if (topCandidates.length > 1) {
+                    const tiedNames = topCandidates
+                        .map(id => roomState.players.find(p => p.id === id)?.name)
+                        .filter(Boolean)
+                        .join(" و ");
+                    roomState.announcement = `⚖️ تعادل في أعلى الأصوات بين (${tiedNames}) بـ ${maxVotes} أصوات لكل منهما! لم يتم إقصاء أحد.`;
+                    addGameLog(`⚖️ اليوم ${roomState.round}: تعادل في الأصوات بين ${tiedNames}، لم يُستبعد أحد.`);
+                } else {
+                    const outPlayer = roomState.players.find(p => p.id === topCandidates[0]);
+                    if (outPlayer) {
+                        outPlayer.alive = false;
+                        const roleInfo = ROLE_DETAILS[outPlayer.role];
+                        roomState.announcement = `⚖️ بأغلبية (${maxVotes} أصوات)، قررت المدينة إقصاء (${outPlayer.name}).. وتبين أن هويته الحقيقية هي: [${roleInfo.icon} ${roleInfo.title}]!`;
+                        addGameLog(`🗳️ اليوم ${roomState.round}: تم التصويت على إقصاء (${outPlayer.name}) وكان دوره [${roleInfo.title}].`);
+                    }
+                }
+            }
+
+            if (!checkWinCondition()) {
+                roomState.phase = 'vote_result';
+            }
+            syncAndRender();
+        }
+
+        function hostNextNight() {
+            playSound('night');
+            roomState.round += 1;
+            roomState.phase = 'night';
+            roomState.votes = {};
+            roomState.lastVoteBreakdown = [];
+            roomState.feedbackByPlayer = {};
+            roomState.nightActions = {
+                mafiaTarget: null,
+                doctorSave: null,
+                detectiveTarget: null,
+                completedRoles: []
+            };
+            roomState.announcement = `🌙 حلّت الليلة (${roomState.round}).. المدينة تغرق في الظلام، وعلى أصحاب الأدوار الخاصة تنفيذ مهامهم!`;
+            syncAndRender();
+            scheduleBotNightActions();
+        }
+
+        function checkWinCondition() {
+            const alive = roomState.players.filter(p => p.alive);
+            const mafiaAlive = alive.filter(p => p.role === 'mafia').length;
+            const townAlive = alive.length - mafiaAlive;
+
+            if (mafiaAlive === 0) {
+                playSound('win');
+                clearInterval(gameTimerInterval);
+                roomState.phase = 'ended';
+                roomState.winner = 'town';
+                roomState.announcement = "🎉 انتصر المدنيون وأهل المدينة! تم كشف وإقصاء جميع أفراد المافيا بنجاح!";
+                addGameLog("🏆 انتهت المباراة بفوز فريق المدنيين!");
+                return true;
+            }
+            if (mafiaAlive >= townAlive) {
+                playSound('win');
+                clearInterval(gameTimerInterval);
+                roomState.phase = 'ended';
+                roomState.winner = 'mafia';
+                roomState.announcement = "🩸 سيطرت المافيا على المدينة بالكامل! تساوى عدد المافيا مع المدنيين وانتصرت المافيا!";
+                addGameLog("🏆 انتهت المباراة بفوز فريق المافيا!");
+                return true;
+            }
+            return false;
+        }
+
+        function hostRestartSameSettings() {
+            startGame();
+        }
+
+        function hostBackToLobby() {
+            playSound('click');
+            clearInterval(gameTimerInterval);
+            roomState.phase = 'lobby';
+            roomState.winner = null;
+            roomState.players.forEach(p => {
+                p.role = null;
+                p.alive = true;
+            });
+            syncAndRender();
+        }
+
+        /* =========================================================
+           10. إدارة المؤقت الزمني التفاعلي (Timer Controls)
+        ========================================================= */
+        function startPhaseTimer(seconds) {
+            clearInterval(gameTimerInterval);
+            roomState.timerSeconds = seconds;
+            roomState.timerPaused = false;
+            updateTimerUI();
+
+            gameTimerInterval = setInterval(() => {
+                if (roomState.timerPaused) return;
+                if (roomState.timerSeconds > 0) {
+                    roomState.timerSeconds--;
+                    updateTimerUI();
+                } else {
+                    clearInterval(gameTimerInterval);
+                    showToast('⏰ انتهى الوقت المخصص لهذه المرحلة!', 'warning');
+                }
+            }, 1000);
+        }
+
+        function modifyTimer(deltaSeconds) {
+            playSound('click');
+            roomState.timerSeconds = Math.max(0, roomState.timerSeconds + deltaSeconds);
+            updateTimerUI();
+        }
+
+        function togglePauseTimer() {
+            playSound('click');
+            roomState.timerPaused = !roomState.timerPaused;
+            const btn = document.getElementById('btn-pause-timer');
+            if (btn) {
+                btn.innerText = roomState.timerPaused ? 'استئناف المؤقت ▶️' : 'إيقاف مؤقت ⏸️';
+            }
+            updateTimerUI();
+        }
+
+        function updateTimerUI() {
+            const box = document.getElementById('timer-display');
+            if (!box) return;
+            const mins = String(Math.floor(roomState.timerSeconds / 60)).padStart(2, '0');
+            const secs = String(roomState.timerSeconds % 60).padStart(2, '0');
+            box.innerText = `${mins}:${secs}`;
+            if (roomState.timerSeconds <= 15) {
+                box.classList.add('text-rose-500', 'animate-pulse');
+                box.classList.remove('text-amber-400');
+            } else {
+                box.classList.remove('text-rose-500', 'animate-pulse');
+                box.classList.add('text-amber-400');
+            }
+        }
+
+        /* =========================================================
+           11. تحديث ورسم جميع عناصر الواجهة (Comprehensive UI Renderer)
+        ========================================================= */
+        function renderAll() {
+            const body = document.getElementById('app-body');
+            const authScreen = document.getElementById('auth-screen');
+            const lobbyScreen = document.getElementById('lobby-screen');
+            const gameScreen = document.getElementById('game-screen');
+            const roomBar = document.getElementById('active-room-bar');
+
+            // الشاشة 1: الدخول
+            if (roomState.phase === 'auth' || !roomState.code) {
+                body.className = "theme-lobby text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                authScreen.classList.remove('hidden');
+                lobbyScreen.classList.add('hidden');
+                gameScreen.classList.add('hidden');
+                roomBar.classList.add('hidden');
+                return;
+            }
+
+            // إظهار شريط الغرفة العلوي
+            roomBar.classList.remove('hidden');
+            document.getElementById('room-code-display').innerText = roomState.code;
+            const me = getMyPlayer();
+            document.getElementById('player-badge-header').innerText = me ? `${me.name} ${me.isHost ? '👑' : ''}` : '';
+
+            // الشاشة 2: اللوبي
+            if (roomState.phase === 'lobby') {
+                body.className = "theme-lobby text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                authScreen.classList.add('hidden');
+                lobbyScreen.classList.remove('hidden');
+                gameScreen.classList.add('hidden');
+                renderLobbyScreen(me);
+                return;
+            }
+
+            // الشاشة 3: داخل المباراة
+            authScreen.classList.add('hidden');
+            lobbyScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            renderActiveGameScreen(me);
+        }
+
+        function renderLobbyScreen(me) {
+            document.getElementById('lobby-count-badge').innerText = `${roomState.players.length} لاعبين`;
+            const listEl = document.getElementById('lobby-players-list');
+            listEl.innerHTML = '';
+
+            roomState.players.forEach(p => {
+                const isMe = p.id === localPlayerId;
+                const li = document.createElement('li');
+                li.className = `px-3.5 py-2.5 rounded-2xl flex items-center justify-between border ${isMe ? 'bg-slate-800/95 border-amber-500/40' : 'bg-slate-900/80 border-slate-800'}`;
+                li.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span class="font-bold text-sm text-white">${p.name}</span>
+                        ${isMe ? '<span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-bold">أنت</span>' : ''}
+                        ${p.isBot ? '<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md font-bold">🤖 بوت ذكي</span>' : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        ${p.isHost
+                            ? '<span class="text-xs text-amber-400 font-extrabold bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">المدير 👑</span>'
+                            : (me && me.isHost
+                                ? `<button onclick="kickPlayer('${p.id}')" class="btn-press text-xs bg-rose-950/90 hover:bg-rose-800 text-rose-300 px-2.5 py-1 rounded-lg border border-rose-800 font-bold">طرد ✖</button>`
+                                : '')
+                        }
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+
+            // تحديث أرقام الأدوار
+            document.getElementById('count-mafia').innerText = roomState.settings.mafia;
+            document.getElementById('count-doctor').innerText = roomState.settings.doctor;
+            document.getElementById('count-detective').innerText = roomState.settings.detective;
+
+            const validation = validateRoleSetup();
+            document.getElementById('count-civilian').innerText = validation.civilians;
+
+            const valBox = document.getElementById('role-validation-box');
+            valBox.classList.remove('hidden');
+            valBox.innerText = validation.msg;
+            if (validation.valid) {
+                valBox.className = "p-3 rounded-xl text-xs font-bold border bg-emerald-950/60 border-emerald-500/40 text-emerald-300";
+            } else {
+                valBox.className = "p-3 rounded-xl text-xs font-bold border bg-rose-950/70 border-rose-500/40 text-rose-300";
+            }
+
+            const isHost = me && me.isHost;
+            document.getElementById('host-settings-panel').classList.toggle('hidden', !isHost);
+            document.getElementById('bot-management-bar').classList.toggle('hidden', !isHost);
+            document.getElementById('guest-wait-box').classList.toggle('hidden', isHost);
+        }
+
+        function renderActiveGameScreen(me) {
+            if (!me) return;
+            const body = document.getElementById('app-body');
+
+            // 1. تحديث حالة الحياة ورقم الجولة
+            const aliveInd = document.getElementById('my-alive-indicator');
+            if (me.alive) {
+                aliveInd.className = "px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                aliveInd.innerText = "🟢 حي في اللعبة";
+            } else {
+                aliveInd.className = "px-2.5 py-1 rounded-full text-xs font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+                aliveInd.innerText = "💀 خارج الجولة (مُقصى)";
+            }
+            document.getElementById('round-counter-badge').innerText = `الجولة ${roomState.round}`;
+
+            // 2. تحديث بيانات كرت الدور السري
+            const roleMeta = ROLE_DETAILS[me.role] || ROLE_DETAILS.civilian;
+            document.getElementById('my-role-icon').innerText = roleMeta.icon;
+            const roleNameEl = document.getElementById('my-role-name');
+            roleNameEl.innerText = roleMeta.title;
+            roleNameEl.className = `text-xl font-black ${roleMeta.color}`;
+            document.getElementById('my-role-desc').innerText = roleMeta.desc;
+
+            const alliesEl = document.getElementById('my-mafia-allies');
+            if (me.role === 'mafia') {
+                const otherMafia = roomState.players.filter(p => p.role === 'mafia' && p.id !== me.id);
+                alliesEl.classList.remove('hidden');
+                alliesEl.innerText = otherMafia.length > 0
+                    ? `🤝 زملاؤك في المافيا: ${otherMafia.map(m => m.name).join(' ، ')}`
+                    : `🦹‍♂️ أنت فرد المافيا الوحيد في هذه الجولة!`;
+            } else {
+                alliesEl.classList.add('hidden');
+            }
+
+            // 3. تحديث الخلفية وشارة المرحلة والمؤقت
+            const phaseBadge = document.getElementById('phase-badge');
+            const timerContainer = document.getElementById('timer-container');
+            const timerHostCtrl = document.getElementById('timer-host-controls');
+
+            if (roomState.phase === 'night') {
+                body.className = "theme-night text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                phaseBadge.className = "bg-indigo-600 text-white px-4 py-1 rounded-full text-xs font-black shadow";
+                phaseBadge.innerText = `🌙 مرحلة الليل (${roomState.round})`;
+                timerContainer.classList.add('hidden');
+            } else if (roomState.phase === 'day') {
+                body.className = "theme-day text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                phaseBadge.className = "bg-amber-500 text-slate-950 px-4 py-1 rounded-full text-xs font-black shadow";
+                phaseBadge.innerText = `☀️ مرحلة النهار والنقاش (${roomState.round})`;
+                timerContainer.classList.remove('hidden');
+                timerHostCtrl.classList.toggle('hidden', !me.isHost);
+            } else if (roomState.phase === 'voting') {
+                body.className = "theme-voting text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                phaseBadge.className = "bg-red-600 text-white px-4 py-1 rounded-full text-xs font-black shadow";
+                const aliveCount = roomState.players.filter(p => p.alive).length;
+                const votedCount = Object.keys(roomState.votes).length;
+                phaseBadge.innerText = `🗳️ التصويت المفتوح (${votedCount} من ${aliveCount} صوّتوا)`;
+                timerContainer.classList.remove('hidden');
+                timerHostCtrl.classList.toggle('hidden', !me.isHost);
+            } else if (roomState.phase === 'vote_result') {
+                body.className = "theme-voting text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                phaseBadge.className = "bg-purple-600 text-white px-4 py-1 rounded-full text-xs font-black shadow";
+                phaseBadge.innerText = `⚖️ نتيجة تصويت المدينة`;
+                timerContainer.classList.add('hidden');
+            } else if (roomState.phase === 'ended') {
+                body.className = "theme-ended text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-700 overflow-x-hidden";
+                phaseBadge.className = "bg-emerald-400 text-slate-950 px-4 py-1 rounded-full text-xs font-black shadow";
+                phaseBadge.innerText = `🏆 نهاية اللعبة وإعلان الفائز`;
+                timerContainer.classList.add('hidden');
+            }
+
+            document.getElementById('phase-announcement').innerText = roomState.announcement;
+
+            // 4. لافتة التأكيد الفوري (Feedback)
+            const fbBanner = document.getElementById('instant-feedback-banner');
+            const myFeedback = roomState.feedbackByPlayer[me.id];
+            if (myFeedback) {
+                fbBanner.classList.remove('hidden');
+                fbBanner.className = `p-3 rounded-2xl text-xs sm:text-sm font-extrabold border ${myFeedback.style}`;
+                fbBanner.innerText = myFeedback.text;
+            } else {
+                fbBanner.classList.add('hidden');
+            }
+
+            // 5. دفتر تحقيقات المحقق
+            const notebook = document.getElementById('detective-notebook');
+            const myHistory = roomState.detectiveHistory[me.id] || [];
+            if (me.role === 'detective' && myHistory.length > 0) {
+                notebook.classList.remove('hidden');
+                document.getElementById('detective-Notebook-count').innerText = `${myHistory.length} فحوصات`;
+                const histGrid = document.getElementById('detective-history-list');
+                histGrid.innerHTML = '';
+                myHistory.forEach(item => {
+                    histGrid.innerHTML += `
+                        <div class="p-2 rounded-xl border ${item.isMafia ? 'bg-rose-950/80 border-rose-500/40 text-rose-200' : 'bg-slate-900 border-slate-700 text-sky-200'} flex items-center justify-between">
+                            <span class="font-bold">${item.name}</span>
+                            <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded ${item.isMafia ? 'bg-rose-600 text-white' : 'bg-sky-800 text-sky-100'}">
+                                ${item.isMafia ? 'مافيا 🦹‍♂️' : 'بريء 👤'}
+                            </span>
+                        </div>
+                    `;
+                });
+            } else {
+                notebook.classList.add('hidden');
+            }
+
+            // 6. رسم منطقة التفاعل الرئيسية (Interaction Area)
+            renderInteractionArea(me);
+
+            // 7. رسم أزرار الهوست
+            renderHostControls(me);
+
+            // 8. رسم سجل الأحداث
+            const logList = document.getElementById('game-events-log');
+            logList.innerHTML = '';
+            roomState.logs.forEach(entry => {
+                logList.innerHTML += `<li class="bg-slate-900/70 px-3 py-1.5 rounded-xl border border-slate-800/80">${entry}</li>`;
+            });
+            const aliveTotal = roomState.players.filter(p => p.alive).length;
+            document.getElementById('alive-summary-badge').innerText = `الأحياء: ${aliveTotal} من ${roomState.players.length}`;
+        }
+
+        function renderInteractionArea(me) {
+            const titleEl = document.getElementById('interaction-title');
+            const subBadge = document.getElementById('interaction-subbadge');
+            const grid = document.getElementById('targets-grid');
+            const skipBox = document.getElementById('skip-vote-container');
+            grid.innerHTML = '';
+            subBadge.innerText = '';
+            skipBox.classList.add('hidden');
+
+            const alivePlayers = roomState.players.filter(p => p.alive);
+
+            // أ) شاشة نهاية اللعبة: كشف جميع الهويات الحقيقية
+            if (roomState.phase === 'ended') {
+                titleEl.innerText = "🎭 كشف الهويات السرية لجميع اللاعبين:";
+                subBadge.innerText = roomState.winner === 'town' ? 'فوز المدنيين 🎉' : 'فوز المافيا 🩸';
+                roomState.players.forEach(p => {
+                    const rInfo = ROLE_DETAILS[p.role] || ROLE_DETAILS.civilian;
+                    grid.innerHTML += `
+                        <div class="p-3 rounded-2xl border ${p.role === 'mafia' ? 'bg-red-950/40 border-red-500/40' : 'bg-slate-900/90 border-slate-800'} flex flex-col justify-between space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-extrabold text-sm text-white">${p.name}</span>
+                                <span class="text-xs">${p.alive ? '🟢 حي' : '💀 مُقصى'}</span>
+                            </div>
+                            <div class="text-xs font-bold ${rInfo.color}">${rInfo.icon} ${rInfo.title}</div>
+                        </div>
+                    `;
+                });
+                return;
+            }
+
+            // ب) إذا كان اللاعب مقتولاً أو مُقصى
+            if (!me.alive && roomState.phase !== 'vote_result') {
+                titleEl.innerText = "💀 أنت خارج الجولة حالياً (مشاهد صامت)";
+                subBadge.innerText = "راقب مجريات اللعبة دون كشف معلومات للأحياء";
+                roomState.players.forEach(p => {
+                    grid.innerHTML += `
+                        <div class="p-3 rounded-2xl border ${p.alive ? 'bg-slate-900/80 border-slate-800 text-slate-200' : 'bg-slate-950/60 border-rose-900/30 text-slate-500 line-through'} flex items-center justify-between text-xs font-bold">
+                            <span>${p.name}</span>
+                            <span>${p.alive ? '🟢' : '💀'}</span>
+                        </div>
+                    `;
+                });
+                return;
+            }
+
+            // ج) مرحلة الليل للأحياء
+            if (roomState.phase === 'night') {
+                if (me.role === 'mafia') {
+                    titleEl.innerText = "🎯 اختر ضحية المافيا لهذه الليلة:";
+                    subBadge.innerText = roomState.nightActions.mafiaTarget ? "تم الاختيار ✅" : "بانتظار قرارك...";
+                    alivePlayers.forEach(p => {
+                        const isSelected = roomState.nightActions.mafiaTarget === p.id;
+                        const isTeammate = p.role === 'mafia';
+                        grid.innerHTML += `
+                            <button onclick="handleNightClick('${p.id}')"
+                                class="btn-press p-3 rounded-2xl border text-right transition flex flex-col justify-between ${
+                                    isSelected
+                                        ? 'bg-red-600 border-red-300 text-white shadow-lg shadow-red-950/60'
+                                        : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-100'
+                                }">
+                                <div class="flex items-center justify-between w-full">
+                                    <span class="font-extrabold text-xs sm:text-sm">${p.name}</span>
+                                    <span>${isSelected ? '🎯' : (isTeammate ? '🦹‍♂️' : '👤')}</span>
+                                </div>
+                                <span class="text-[10px] ${isSelected ? 'text-red-100' : 'text-slate-400'} mt-1">
+                                    ${isSelected ? 'الضحية المحددة حالياً' : (isTeammate ? 'زميلك في المافيا' : 'اضغط للاستهداف')}
+                                </span>
+                            </button>
+                        `;
+                    });
+                } else if (me.role === 'doctor') {
+                    titleEl.innerText = "💉 اختر لاعباً لحمايته من القتل الليلة (يمكنك حماية نفسك):";
+                    subBadge.innerText = roomState.nightActions.doctorSave ? "تمت الحماية ✅" : "بانتظار قرارك...";
+                    alivePlayers.forEach(p => {
+                        const isSelected = roomState.nightActions.doctorSave === p.id;
+                        grid.innerHTML += `
+                            <button onclick="handleNightClick('${p.id}')"
+                                class="btn-press p-3 rounded-2xl border text-right transition flex flex-col justify-between ${
+                                    isSelected
+                                        ? 'bg-emerald-600 border-emerald-300 text-white shadow-lg shadow-emerald-950/60'
+                                        : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-100'
+                                }">
+                                <div class="flex items-center justify-between w-full">
+                                    <span class="font-extrabold text-xs sm:text-sm">${p.name}</span>
+                                    <span>${isSelected ? '🛡️' : '💉'}</span>
+                                </div>
+                                <span class="text-[10px] ${isSelected ? 'text-emerald-100' : 'text-slate-400'} mt-1">
+                                    ${isSelected ? 'تحت حمايتك الطبية' : (p.id === me.id ? 'حماية نفسك' : 'اضغط للحماية')}
+                                </span>
+                            </button>
+                        `;
+                    });
+                } else if (me.role === 'detective') {
+                    const alreadyCheckedTonight = roomState.nightActions.completedRoles.includes('detective_' + me.id);
+                    titleEl.innerText = "🔍 اختر لاعباً واحداً لفحص هويته السرية:";
+                    subBadge.innerText = alreadyCheckedTonight ? "تم الفحص الليلة ✅" : "متاح فحص واحد";
+                    alivePlayers.filter(p => p.id !== me.id).forEach(p => {
+                        const prevRecord = (roomState.detectiveHistory[me.id] || []).find(h => h.targetId === p.id);
+                        grid.innerHTML += `
+                            <button onclick="handleNightClick('${p.id}')" ${alreadyCheckedTonight ? 'disabled' : ''}
+                                class="btn-press p-3 rounded-2xl border text-right transition flex flex-col justify-between ${
+                                    prevRecord
+                                        ? (prevRecord.isMafia ? 'bg-rose-950/80 border-rose-500/50 text-rose-200' : 'bg-sky-950/80 border-sky-500/50 text-sky-200')
+                                        : (alreadyCheckedTonight ? 'bg-slate-900/50 border-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-100')
+                                }">
+                                <div class="flex items-center justify-between w-full">
+                                    <span class="font-extrabold text-xs sm:text-sm">${p.name}</span>
+                                    <span>${prevRecord ? (prevRecord.isMafia ? '🦹‍♂️' : '✅') : '🔍'}</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 mt-1">
+                                    ${prevRecord ? (prevRecord.isMafia ? 'مكشوف: مافيا!' : 'مكشوف: مدني بريء') : 'اضغط لكشف الهوية'}
+                                </span>
+                            </button>
+                        `;
+                    });
+                } else {
+                    // المدني في الليل: أزرار تمويه تفاعلية
+                    titleEl.innerText = "🎭 لوحة التمويه الليلي للمدنيين:";
+                    subBadge.innerText = "اضغط للتمويه على الجالسين حولك";
+                    const decoys = [
+                        "تمويه: فحص الملفات 🗂️",
+                        "تمويه: مراقبة التحركات 👀",
+                        "تمويه: تأمين الأبواب 🔒",
+                        "تمويه: إرسال إشارة سرية 📡"
+                    ];
+                    decoys.forEach((label, idx) => {
+                        grid.innerHTML += `
+                            <button onclick="triggerCivilianDecoyClick(${idx})"
+                                class="btn-press bg-slate-900/90 hover:bg-indigo-950/80 border border-slate-700 hover:border-indigo-500/40 p-3 rounded-2xl text-xs font-bold text-slate-200 text-center transition">
+                                ${label}
+                            </button>
+                        `;
+                    });
+                }
+                return;
+            }
+
+            // د) مرحلة النهار والنقاش
+            if (roomState.phase === 'day') {
+                titleEl.innerText = "☀️ حالة اللاعبين في المدينة أثناء النقاش:";
+                subBadge.innerText = `${alivePlayers.length} أحياء`;
+                roomState.players.forEach(p => {
+                    grid.innerHTML += `
+                        <div class="p-3 rounded-2xl border ${p.alive ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-slate-950/60 border-rose-900/30 text-slate-500 line-through'} flex items-center justify-between">
+                            <span class="font-bold text-xs sm:text-sm">${p.name}</span>
+                            <span class="text-xs font-bold ${p.alive ? 'text-emerald-400' : 'text-rose-400'}">
+                                ${p.alive ? '🟢 حي' : '💀 خارج'}
+                            </span>
+                        </div>
+                    `;
+                });
+                return;
+            }
+
+            // هـ) مرحلة التصويت النهاري
+            if (roomState.phase === 'voting') {
+                titleEl.innerText = "🗳️ اختر المشتبه به للتصويت على إقصائه:";
+                const myCurrentVote = roomState.votes[me.id];
+                subBadge.innerText = myCurrentVote ? "تم تسجيل صوتك ✅" : "لم تصوّت بعد";
+                skipBox.classList.remove('hidden');
+
+                const skipBtn = document.getElementById('btn-skip-vote');
+                if (myCurrentVote === 'skip') {
+                    skipBtn.className = "btn-press w-full bg-amber-500 text-slate-950 font-black py-2.5 px-4 rounded-xl border border-amber-300 text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg";
+                } else {
+                    skipBtn.className = "btn-press w-full bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl border border-slate-600 text-xs sm:text-sm flex items-center justify-center gap-2";
+                }
+
+                alivePlayers.forEach(p => {
+                    const isMyTarget = myCurrentVote === p.id;
+                    const hasVoted = Boolean(roomState.votes[p.id]);
+                    grid.innerHTML += `
+                        <button onclick="castDayVote('${p.id}')"
+                            class="btn-press p-3 rounded-2xl border text-right transition flex flex-col justify-between ${
+                                isMyTarget
+                                    ? 'bg-red-600 border-red-300 text-white shadow-lg shadow-red-950/60'
+                                    : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-100'
+                            }">
+                            <div class="flex items-center justify-between w-full">
+                                <span class="font-extrabold text-xs sm:text-sm">${p.name} ${p.id === me.id ? '(أنت)' : ''}</span>
+                                <span>${isMyTarget ? '🎯' : '🗳️'}</span>
+                            </div>
+                            <div class="flex items-center justify-between w-full mt-1.5 text-[10px]">
+                                <span class="${isMyTarget ? 'text-red-100 font-bold' : 'text-slate-400'}">
+                                    ${isMyTarget ? '✓ صوتك الحالي' : 'اضغط للتصويت ضده'}
+                                </span>
+                                ${hasVoted ? '<span class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">صوّت ✅</span>' : ''}
+                            </div>
+                        </button>
+                    `;
+                });
+                return;
+            }
+
+            // و) مرحلة عرض تفاصيل الأصوات بعد الفرز
+            if (roomState.phase === 'vote_result') {
+                titleEl.innerText = "📊 تفاصيل فرز الأصوات في هذه الجولة:";
+                if (roomState.lastVoteBreakdown.length === 0) {
+                    grid.innerHTML = `<div class="col-span-2 text-center text-xs text-slate-400 py-3">لم يتم تسجيل أي أصوات في هذه الجولة.</div>`;
+                } else {
+                    roomState.lastVoteBreakdown.forEach(item => {
+                        grid.innerHTML += `
+                            <div class="p-3 rounded-2xl border ${item.isSkip ? 'bg-slate-900 border-slate-700' : 'bg-rose-950/40 border-rose-500/30'} flex items-center justify-between">
+                                <span class="font-bold text-xs sm:text-sm text-white">${item.name}</span>
+                                <span class="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-slate-950 text-amber-400 border border-slate-800">
+                                    ${item.count} صوت
+                                </span>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        }
+
+        function renderHostControls(me) {
+            const hostPanel = document.getElementById('host-game-controls');
+            if (!me || !me.isHost) {
+                hostPanel.classList.add('hidden');
+                return;
+            }
+            hostPanel.classList.remove('hidden');
+
+            // حساب اكتمال مهام الليل للأدوار الحية
+            const hostStatus = document.getElementById('host-night-status');
+            if (roomState.phase === 'night') {
+                const alive = roomState.players.filter(p => p.alive);
+                let requiredCount = 0;
+                let doneCount = 0;
+                if (alive.some(p => p.role === 'mafia')) {
+                    requiredCount++;
+                    if (roomState.nightActions.mafiaTarget) doneCount++;
+                }
+                if (alive.some(p => p.role === 'doctor')) {
+                    requiredCount++;
+                    if (roomState.nightActions.doctorSave) doneCount++;
+                }
+                if (alive.some(p => p.role === 'detective')) {
+                    requiredCount++;
+                    if (roomState.nightActions.completedRoles.includes('detective')) doneCount++;
+                }
+                hostStatus.innerText = doneCount >= requiredCount
+                    ? `اكتملت قرارات الليل (${doneCount}/${requiredCount}) ✅`
+                    : `بانتظار قرارات الليل (${doneCount}/${requiredCount})...`;
+            } else if (roomState.phase === 'voting') {
+                const aliveCount = roomState.players.filter(p => p.alive).length;
+                const votedCount = Object.keys(roomState.votes).length;
+                hostStatus.innerText = votedCount >= aliveCount
+                    ? `اكتمل تصويت الجميع (${votedCount}/${aliveCount}) ✅`
+                    : `صوّت ${votedCount} من ${aliveCount}...`;
+            } else {
+                hostStatus.innerText = '';
+            }
+
+            document.getElementById('btn-host-end-night').classList.toggle('hidden', roomState.phase !== 'night');
+            document.getElementById('btn-host-start-voting').classList.toggle('hidden', roomState.phase !== 'day');
+            document.getElementById('btn-host-end-voting').classList.toggle('hidden', roomState.phase !== 'voting');
+            document.getElementById('btn-host-next-night').classList.toggle('hidden', roomState.phase !== 'vote_result');
+            document.getElementById('host-ended-buttons').classList.toggle('hidden', roomState.phase !== 'ended');
+        }
+
+        /* =========================================================
+           12. دوال نسخ وتنزيل كود السيرفر المحلي (server.py)
+        ========================================================= */
+        function copyServerCode() {
+            playSound('click');
+            const codeText = document.getElementById('python-server-code').innerText;
+            const temp = document.createElement('textarea');
+            temp.value = codeText;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast('📋 تم نسخ كود السيرفر (server.py) بالكامل!', 'success');
+        }
+
+        function downloadServerFile() {
+            playSound('click');
+            const codeText = document.getElementById('python-server-code').innerText;
+            const blob = new Blob([codeText], { type: 'text/x-python;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'server.py';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('💾 تم بدء تنزيل ملف server.py!', 'success');
+        }
+
+        // تهيئة التطبيق عند التحميل
+        window.onload = function () {
+            renderAll();
+        };
+    </script>
+</body>
+</html>
